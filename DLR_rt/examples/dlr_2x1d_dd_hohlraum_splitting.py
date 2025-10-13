@@ -19,19 +19,19 @@ Ny = 200
 Nphi = 200
 dt = 0.5 / Nx
 r = 5
-t_f = 0.7
-snapshots = 2
-fs = 16
+t_f = 1.2
+snapshots = 7
+fs = 26
 savepath = "plots/"
 method = "lie"
 option_scheme = "upwind"
 option_problem = "hohlraum"
 option_timescheme = "RK4"
 
-option_error_estimate = True
+option_error_estimate = False
 
-tol_sing_val = 1e-6
-drop_tol = 5e-10
+tol_sing_val = 1e-7
+drop_tol = 1e-10
 tol_lattice = 2e-11
 
 

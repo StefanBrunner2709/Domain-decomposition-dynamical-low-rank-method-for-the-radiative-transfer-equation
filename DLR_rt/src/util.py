@@ -194,7 +194,7 @@ def computeD_upwind_2x1d(grid: Grid_2x1d, option_dd: str = "no_dd"):
 
     return DX_0.tocsr(), DX_1.tocsr(), DY_0.tocsr(), DY_1.tocsr()
 
-def plot_rho_subgrids(subgrids, lr_on_subgrids, fs = 16, savepath = "plots/", t = 0.0, 
+def plot_rho_subgrids(subgrids, lr_on_subgrids, fs = 26, savepath = "plots/", t = 0.0, 
                       plot_option = "normal", plot_name_add = ""):
     """
     Plot rho over x and y.
@@ -278,7 +278,7 @@ def plot_rho_subgrids(subgrids, lr_on_subgrids, fs = 16, savepath = "plots/", t 
 
 def plot_ranks_subgrids(subgrids, time, 
                         rank_on_subgrids_adapted, rank_on_subgrids_dropped, 
-                        fs = 16, savepath = "plots/", option = "lattice",
+                        fs = 26, savepath = "plots/", option = "lattice",
                         plot_name_add = ""):
     
     ### Plot for rank over time
@@ -292,10 +292,10 @@ def plot_ranks_subgrids(subgrids, time,
 
             plt.plot(time,  rank_on_subgrids_adapted[j][i])
 
-    plt.title("adapted ranks")
     axes.set_xlabel("$t$", fontsize=fs)
     axes.set_ylabel("$r(t)$", fontsize=fs)
     axes.set_xlim(time[0], time[-1]) # Remove extra padding: set x-limits to data range
+    axes.tick_params(axis='both', which='major', labelsize=fs)
     plt.savefig(savepath + plot_name_add 
                 + "dd_splitting_2x1d_subgrids_rank_adapted.pdf")
 
@@ -305,10 +305,10 @@ def plot_ranks_subgrids(subgrids, time,
 
             plt.plot(time,  rank_on_subgrids_dropped[j][i])
 
-    plt.title("dropped ranks")
     axes.set_xlabel("$t$", fontsize=fs)
     axes.set_ylabel("$r(t)$", fontsize=fs)
     axes.set_xlim(time[0], time[-1]) # Remove extra padding: set x-limits to data range
+    axes.tick_params(axis='both', which='major', labelsize=fs)
     plt.savefig(savepath + plot_name_add 
                 + "dd_splitting_2x1d_subgrids_rank_dropped.pdf")
 
@@ -340,7 +340,6 @@ def plot_ranks_subgrids(subgrids, time,
         ax.set_yticks(np.arange(-0.5, n_split_y, 1), minor=True)
         ax.grid(which='minor', color='black', linewidth=1)
         ax.tick_params(which='minor', length=0)
-        ax.set_title("Final adapted ranks for subdomains")
 
     else:
 
@@ -373,7 +372,6 @@ def plot_ranks_subgrids(subgrids, time,
         ax.set_ylim(0, 1)
         ax.set_xticks([])
         ax.set_yticks([])
-        ax.set_title("Final adapted ranks for subdomains")
         ax.set_aspect('equal')
 
     plt.savefig(savepath + plot_name_add 
@@ -405,7 +403,6 @@ def plot_ranks_subgrids(subgrids, time,
         ax.set_yticks(np.arange(-0.5, n_split_y, 1), minor=True)
         ax.grid(which='minor', color='black', linewidth=1)
         ax.tick_params(which='minor', length=0)
-        ax.set_title("Final dropped ranks for subdomains")
 
     else:
 
@@ -438,7 +435,6 @@ def plot_ranks_subgrids(subgrids, time,
         ax.set_ylim(0, 1)
         ax.set_xticks([])
         ax.set_yticks([])
-        ax.set_title("Final dropped ranks for subdomains")
         ax.set_aspect('equal')
 
     plt.savefig(savepath + plot_name_add 
@@ -447,7 +443,7 @@ def plot_ranks_subgrids(subgrids, time,
 
     return
 
-def plot_rho_onedomain(grid, lr, fs = 16, savepath = "plots/", t = 0.0, 
+def plot_rho_onedomain(grid, lr, fs = 26, savepath = "plots/", t = 0.0, 
                       plot_option = "log", plot_name_add = ""):
     """
     Plot rho over x and y.

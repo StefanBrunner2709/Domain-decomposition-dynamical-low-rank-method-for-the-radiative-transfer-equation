@@ -8,13 +8,13 @@ from DLR_rt.src.util import setup_coeff_source_1domain
 
 ### Plotting
 
-option_bc = "hohlraum"
+option_bc = "lattice"
 r = 5
 t_f = 0.7
-snapshots = 2
-tol_sing_val = 1e-6
-drop_tol = 5e-10
-tol_lattice = 2e-11
+snapshots = 8
+tol_sing_val = 1e-7
+drop_tol = 1e-10
+tol_lattice = 1e-11
 
 method = "lie"
 option_grid = "dd"      # Just changes how gridpoints are chosen
@@ -23,7 +23,7 @@ option_timescheme = "RK4"
 
 option_error_estimate = True
 
-fs = 16
+fs = 26
 savepath = "plots/"
 
 
@@ -102,18 +102,18 @@ lr, time, rank_adapted, rank_dropped = integrate_1domain(lr0, grid,
 
 fig, axes = plt.subplots(1, 1, figsize=(10, 8))
 plt.plot(time, rank_adapted)
-plt.title("adapted rank " + option_bc + " simulation")
 axes.set_xlabel("$t$", fontsize=fs)
 axes.set_ylabel("$r(t)$", fontsize=fs)
 axes.set_xlim(time[0], time[-1]) # Remove extra padding: set x-limits to data range  
+axes.tick_params(axis='both', which='major', labelsize=fs)
 plt.savefig(savepath + "1domainsim_rank_adapted.pdf")
 
 fig, axes = plt.subplots(1, 1, figsize=(10, 8))
 plt.plot(time, rank_dropped)
-plt.title("dropped rank " + option_bc + " simulation")
 axes.set_xlabel("$t$", fontsize=fs)
 axes.set_ylabel("$r(t)$", fontsize=fs)
-axes.set_xlim(time[0], time[-1]) # Remove extra padding: set x-limits to data range  
+axes.set_xlim(time[0], time[-1]) # Remove extra padding: set x-limits to data range
+axes.tick_params(axis='both', which='major', labelsize=fs)  
 plt.savefig(savepath + "1domainsim_rank_dropped.pdf")
 
 
@@ -146,16 +146,16 @@ if option_error_estimate:
 
     fig, axes = plt.subplots(1, 1, figsize=(10, 8))
     plt.plot(time_2, rank_adapted_2)
-    plt.title("adapted rank " + option_bc + " simulation")
     axes.set_xlabel("$t$", fontsize=fs)
     axes.set_ylabel("$r(t)$", fontsize=fs)
     axes.set_xlim(time[0], time[-1]) # Remove extra padding: set x-limits to data range
+    axes.tick_params(axis='both', which='major', labelsize=fs)
     plt.savefig(savepath + "high_rank_1domainsim_rank_adapted_2.pdf")
 
     fig, axes = plt.subplots(1, 1, figsize=(10, 8))
     plt.plot(time_2, rank_dropped_2)
-    plt.title("dropped rank " + option_bc + " simulation")
     axes.set_xlabel("$t$", fontsize=fs)
     axes.set_ylabel("$r(t)$", fontsize=fs)
     axes.set_xlim(time[0], time[-1]) # Remove extra padding: set x-limits to data range
+    axes.tick_params(axis='both', which='major', labelsize=fs)
     plt.savefig(savepath + "high_rank_1domainsim_rank_dropped_2.pdf")
