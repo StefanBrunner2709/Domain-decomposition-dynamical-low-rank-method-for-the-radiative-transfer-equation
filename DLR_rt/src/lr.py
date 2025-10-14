@@ -196,7 +196,9 @@ def computeF_b_2x1d_X(f, grid, f_left=None, f_right=None, f_periodic=None,
                 F_b_X[:ny, mask_left] = 1.0
             elif option_bc == "pointsource":
                 F_b_X[:ny, mask_left] = 0.0
-                F_b_X[int(grid.Ny * 9 / 10), mask_left] = 1.0
+                value = 1 / (2 * np.pi) * np.exp(-((grid.Y - 0.85 - grid.dy/2) ** 2) 
+                                                 / (1e-5))
+                F_b_X[:ny, mask_left] = np.tile(value[:, None], np.sum(mask_left))
 
             F_b_X[ny:, mask_left] = outflow_right(f)[:, mask_left]
 
