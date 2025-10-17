@@ -128,10 +128,10 @@ def integrate_dd_hohlraum(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                                     if j == n_split_y-2:
                                         F_b_X[: len(subgrids[j][i].Y), k] = (
                                             1
-                                            / (2 * np.pi)
+                                            / (np.sqrt(2 * np.pi)*1e-2)
                                             * np.exp(-((subgrids[j][i].Y - 0.85
                                                         -subgrids[j][i].dy/2) ** 2) 
-                                                     / (1e-5))
+                                                     / (2*(1e-2)**2))
                                         )
                     elif i==n_split_x-1:
                         F_b_X = computeF_b_2x1d_X(f_on_subgrids[j][i],subgrids[j][i],
