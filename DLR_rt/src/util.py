@@ -268,12 +268,16 @@ def plot_rho_subgrids(subgrids, lr_on_subgrids, fs = 26, savepath = "plots/", t 
 
     formatter = FuncFormatter(sci_notation_formatter)
 
+    exponent = int(np.floor(np.log10(np.max(rho_matrix))))
+    factor = 10 ** (exponent - 3 + 1)
+    cbar_max = np.floor(np.max(rho_matrix) / factor) * factor
+
     if plot_option == "normal":
         cbar_fixed = fig.colorbar(im, ax=axes)
         cbar_fixed.set_ticks([np.min(rho_matrix_full), np.max(rho_matrix_full)])
     elif plot_option == "log":
         cbar_fixed = fig.colorbar(im, ax=axes, format=formatter)
-        ticks = [1e-3, np.floor(np.max(rho_matrix_full))]
+        ticks = [1e-3, cbar_max]
         cbar_fixed.set_ticks(ticks)
         cbar_fixed.ax.minorticks_off()
     cbar_fixed.ax.tick_params(labelsize=fs)
@@ -499,8 +503,12 @@ def plot_rho_onedomain(grid, lr, fs = 26, savepath = "plots/", t = 0.0,
 
     formatter = FuncFormatter(sci_notation_formatter)
 
+    exponent = int(np.floor(np.log10(np.max(rho_matrix))))
+    factor = 10 ** (exponent - 3 + 1)
+    cbar_max = np.floor(np.max(rho_matrix) / factor) * factor
+
     cbar_fixed = fig.colorbar(im, ax=axes, format=formatter)
-    ticks = [1e-3, np.floor(np.max(rho_matrix))]
+    ticks = [1e-3, cbar_max]
     cbar_fixed.set_ticks(ticks)
     
     cbar_fixed.ax.minorticks_off()
