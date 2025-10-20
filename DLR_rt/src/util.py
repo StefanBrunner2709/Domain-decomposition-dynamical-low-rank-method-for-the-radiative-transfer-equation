@@ -7,6 +7,7 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm
+from matplotlib.ticker import FuncFormatter
 from scipy import sparse
 from scipy.sparse import diags
 
@@ -244,9 +245,9 @@ def plot_rho_subgrids(subgrids, lr_on_subgrids, fs = 26, savepath = "plots/", t 
     if plot_option == "normal":
         im = axes.imshow(rho_matrix_full.T, extent=extent, origin="lower", cmap="jet")
     elif plot_option == "log":
-        rho_matrix_full = np.clip(rho_matrix_full, np.exp(-7), None)
+        rho_matrix_full = np.clip(rho_matrix_full, 1e-3, None)
         im = axes.imshow(rho_matrix_full.T, extent=extent, origin="lower", 
-                         norm=LogNorm(vmin=np.exp(-7), vmax=np.max(rho_matrix_full)), 
+                         norm=LogNorm(vmin=1e-3, vmax=np.max(rho_matrix_full)), 
                          cmap="jet")
     axes.set_xlabel("$x$", fontsize=fs)
     axes.set_ylabel("$y$", fontsize=fs)
@@ -254,13 +255,26 @@ def plot_rho_subgrids(subgrids, lr_on_subgrids, fs = 26, savepath = "plots/", t 
     axes.set_yticks([0, 0.5, 1])
     axes.tick_params(axis="both", labelsize=fs, pad=10)
 
-    cbar_fixed = fig.colorbar(im, ax=axes)
+    # --- Custom formatter for n.m × 10^{x} ---
+    def sci_notation_formatter(value, pos):
+        if value == 0:
+            return "0"
+        exponent = int(np.floor(np.log10(value)))
+        coeff = value / 10**exponent
+        if coeff == 1.0:
+            return rf"$10^{{{exponent}}}$"
+        else:
+            return rf"${coeff} \cdot 10^{{{exponent}}}$"
+
+    formatter = FuncFormatter(sci_notation_formatter)
+
     if plot_option == "normal":
+        cbar_fixed = fig.colorbar(im, ax=axes)
         cbar_fixed.set_ticks([np.min(rho_matrix_full), np.max(rho_matrix_full)])
     elif plot_option == "log":
-        ticks = [np.exp(-7), np.max(rho_matrix_full)]
+        cbar_fixed = fig.colorbar(im, ax=axes, format=formatter)
+        ticks = [1e-3, np.floor(np.max(rho_matrix_full))]
         cbar_fixed.set_ticks(ticks)
-        cbar_fixed.ax.set_yticklabels([f"{np.log(t):.2f}" for t in ticks])
         cbar_fixed.ax.minorticks_off()
     cbar_fixed.ax.tick_params(labelsize=fs)
 
@@ -462,9 +476,9 @@ def plot_rho_onedomain(grid, lr, fs = 26, savepath = "plots/", t = 0.0,
     extent = [grid.X[0], grid.X[-1], grid.Y[0], grid.Y[-1]]
     fig, axes = plt.subplots(1, 1, figsize=(10, 8))
 
-    rho_matrix = np.clip(rho_matrix, np.exp(-7), None)
+    rho_matrix = np.clip(rho_matrix, 1e-3, None)
     im = axes.imshow(rho_matrix.T, extent=extent, origin="lower", 
-                    norm=LogNorm(vmin=np.exp(-7), vmax=np.max(rho_matrix)), 
+                    norm=LogNorm(vmin=1e-3, vmax=np.max(rho_matrix)), 
                     cmap="jet")
     axes.set_xlabel("$x$", fontsize=fs)
     axes.set_ylabel("$y$", fontsize=fs)
@@ -472,10 +486,23 @@ def plot_rho_onedomain(grid, lr, fs = 26, savepath = "plots/", t = 0.0,
     axes.set_yticks([0, 0.5, 1])
     axes.tick_params(axis="both", labelsize=fs, pad=10)
 
-    cbar_fixed = fig.colorbar(im, ax=axes)
-    ticks = [np.exp(-7), np.max(rho_matrix)]
+    # --- Custom formatter for n.m × 10^{x} ---
+    def sci_notation_formatter(value, pos):
+        if value == 0:
+            return "0"
+        exponent = int(np.floor(np.log10(value)))
+        coeff = value / 10**exponent
+        if coeff == 1.0:
+            return rf"$10^{{{exponent}}}$"
+        else:
+            return rf"${coeff} \cdot 10^{{{exponent}}}$"
+
+    formatter = FuncFormatter(sci_notation_formatter)
+
+    cbar_fixed = fig.colorbar(im, ax=axes, format=formatter)
+    ticks = [1e-3, np.floor(np.max(rho_matrix))]
     cbar_fixed.set_ticks(ticks)
-    cbar_fixed.ax.set_yticklabels([f"{np.log(t):.2f}" for t in ticks])
+    
     cbar_fixed.ax.minorticks_off()
     cbar_fixed.ax.tick_params(labelsize=fs)
 
