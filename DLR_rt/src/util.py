@@ -268,9 +268,9 @@ def plot_rho_subgrids(subgrids, lr_on_subgrids, fs = 26, savepath = "plots/", t 
 
     formatter = FuncFormatter(sci_notation_formatter)
 
-    exponent = int(np.floor(np.log10(np.max(rho_matrix))))
+    exponent = int(np.floor(np.log10(np.max(rho_matrix_full))))
     factor = 10 ** (exponent - 3 + 1)
-    cbar_max = np.floor(np.max(rho_matrix) / factor) * factor
+    cbar_max = np.floor(np.max(rho_matrix_full) / factor) * factor
 
     if plot_option == "normal":
         cbar_fixed = fig.colorbar(im, ax=axes)
