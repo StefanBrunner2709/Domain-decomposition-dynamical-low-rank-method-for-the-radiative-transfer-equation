@@ -39,7 +39,7 @@ elif option_bc == "hohlraum":
 elif option_bc == "pointsource":
     Nx = 600
     Ny = 600
-    Nphi = 600
+    Nphi = 200
 
 # Timestepsize
 dt = 0.5 / Nx

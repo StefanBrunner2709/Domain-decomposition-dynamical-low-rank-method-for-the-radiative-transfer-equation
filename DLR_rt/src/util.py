@@ -264,7 +264,7 @@ def plot_rho_subgrids(subgrids, lr_on_subgrids, fs = 26, savepath = "plots/", t 
         if coeff == 1.0:
             return rf"$10^{{{exponent}}}$"
         else:
-            return rf"${coeff} \cdot 10^{{{exponent}}}$"
+            return rf"${coeff:.2f} \cdot 10^{{{exponent}}}$"
 
     formatter = FuncFormatter(sci_notation_formatter)
 
@@ -499,7 +499,7 @@ def plot_rho_onedomain(grid, lr, fs = 26, savepath = "plots/", t = 0.0,
         if coeff == 1.0:
             return rf"$10^{{{exponent}}}$"
         else:
-            return rf"${coeff} \cdot 10^{{{exponent}}}$"
+            return rf"${coeff:.2f} \cdot 10^{{{exponent}}}$"
 
     formatter = FuncFormatter(sci_notation_formatter)
 
