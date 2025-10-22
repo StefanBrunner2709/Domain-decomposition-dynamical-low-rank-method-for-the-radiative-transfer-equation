@@ -1,4 +1,26 @@
 # DLR-rt
-Dynamical low rank solver for the radiative transfer equation with both periodic and inflow/outflow boundary conditions.
+Dynamical low rank solver for the 1x1 dimensional and 2x1 dimensional radiative transfer equation.
 
-Additionally, options to plot solutions and compare them to classic solvers.
+## Installation
+Install with `pip` or `uv` by typing
+```shell
+pip install .
+```
+or
+```shell
+uv pip install .
+```
+
+## Run results for publication
+To reproduce the results in "Domain decomposition with dynamical low rank methods for the 2x1 dimensional radiative transfer equation", run 
+```shell
+python3 DLR_rt/examples/dlr_2x1d_periodic_spacedepcoeff.py
+```
+and
+```shell
+python3 DLR_rt/examples/dlr_2x1d_dd_lattice_splitting.py
+```
+and
+```shell
+python3 DLR_rt/examples/dlr_2x1d_dd_hohlraum_splitting.py
+```
