@@ -10,6 +10,15 @@ class LR:
     Low rank class.
 
     Generate low rank structure using matrices U, S and V.
+
+    Parameters
+    ----------
+    U
+        Low rank matrix depending on space.
+    S
+        Low rank matrix.
+    V
+        Low rank matrix depending on angular velocity.
     """
 
     def __init__(self, U, S, V):
@@ -110,6 +119,12 @@ def computeF_b_2x1d_X(f, grid, f_left=None, f_right=None, f_periodic=None,
         Values of subdomain on right side, given as matrix.
     f_periodic
         Values of subdomain on other side of periodic boundary, given as matrix.
+    grid_left
+        Grid class of left subdomain.
+    grid_right
+        Grid class of right subdomain.
+    option_bc
+        Can be chosen "standard", "lattice", "hohlraum" or "pointsource".
     """
 
     if grid_left is None:
@@ -240,6 +255,12 @@ def computeF_b_2x1d_Y(f, grid, f_bottom=None, f_top=None, f_periodic=None,
         Values of subdomain on top, given as matrix.
     f_periodic
         Values of subdomain on other side of periodic boundary, given as matrix.
+    grid_bottom
+        Grid class of bottom subdomain.
+    grid_top
+        Grid class of top subdomain.
+    option_bc
+        Can be chosen "standard", "lattice", "hohlraum" or "pointsource".
     """
 
     if grid_bottom is None:
@@ -333,6 +354,15 @@ def computeK_bdry(lr, grid, F_b):
 
     Transforms the boundary information given by F_b 
     (discretization of inflow/outflow function) into a boundary information in K.
+
+    Parameters
+    ----------
+    lr
+        Low rank structure.
+    grid
+        Grid class.
+    F_b
+        Boundary values, given as matrix.
     """
 
     e_vec_left = np.zeros([len(grid.MU)])
@@ -387,6 +417,15 @@ def computeK_bdry_2x1d_X(lr, grid, F_b_X):
     Compute X grid boundary values for K in 2x1d.
 
     Transforms the boundary information given by F_b_X into a boundary information in K.
+
+    Parameters
+    ----------
+    lr
+        Low rank structure on current subdomain.
+    grid
+        Grid class of current subdomain.
+    F_b_X
+        Left/right boundary values, given as matrix.
     """
     # --- Precompute masks for PHI direction ---
     mask_left = (np.pi / 2 > grid.PHI) | (3 * np.pi / 2 < grid.PHI)
@@ -446,10 +485,19 @@ def computeK_bdry_2x1d_Y(lr, grid, F_b_Y):
     Compute Y grid boundary values for K in 2x1d.
 
     Transforms the boundary information given by F_b_Y into a boundary information in K.
+
+    Parameters
+    ----------
+    lr
+        Low rank structure on current subdomain.
+    grid
+        Grid class of current subdomain.
+    F_b_Y
+        Bottom/top boundary values, given as matrix.
     """
     # --- Precompute masks for PHI direction ---
     mask_bottom = (np.pi > grid.PHI)
-    mask_top = ~mask_bottom  # opposite of bpttom
+    mask_top = ~mask_bottom  # opposite of bottom
 
     # --- Fill e_mats using masks (vectorized) ---
     e_mat_bottom = np.zeros((grid.Nx, grid.Nphi))
@@ -499,6 +547,17 @@ def computedxK(lr, K_bdry_left, K_bdry_right, grid):
     Compute the derivative of K.
 
     Compute the first derivative of K in x using a centered difference stencil.
+
+    Parameters
+    ----------
+    lr
+        Low rank structure.
+    K_bdry_left
+        Boundary values on the left side, given as vector.
+    K_bdry_right
+        Boundary values on the right side, given as vector.
+    grid
+        Grid class.
     """
     K = lr.U @ lr.S
 
@@ -521,6 +580,25 @@ def computedxK_2x1d(
     Compute the gradient of K.
 
     Compute the first derivative of K in x and y using a centered difference stencil.
+
+    Parameters
+    ----------
+    lr
+        Low rank structure.
+    K_bdry_left
+        Boundary values on the left side, given as vector.
+    K_bdry_right
+        Boundary values on the right side, given as vector.
+    K_bdry_bottom
+        Boundary values at the bottom, given as vector.
+    K_bdry_top
+        Boundary values at the top, given as vector.
+    grid
+        Grid class.
+    DX
+        Centered differences matrix in x direction.
+    DY
+        Centered differences matrix in y direction.
     """
     K = lr.U @ lr.S
 
@@ -550,6 +628,37 @@ def computedxK_2x1d_upwind(
     Compute the gradient of K.
 
     Compute the first derivative of K in x and y using an upwind stencil.
+
+    Parameters
+    ----------
+    lr
+        Low rank structure.
+    K_bdry_left
+        Boundary values on the left side, given as vector.
+    K_bdry_right
+        Boundary values on the right side, given as vector.
+    K_bdry_bottom
+        Boundary values at the bottom, given as vector.
+    K_bdry_top
+        Boundary values at the top, given as vector.
+    grid
+        Grid class.
+    DX_0
+        Upwind matrix in x direction for positive eigenvalues.
+    DX_1
+        Upwind matrix in x direction for negative eigenvalues.
+    DY_0
+        Upwind matrix in y direction for positive eigenvalues.
+    DY_1
+        Upwind matrix in y direction for negative eigenvalues.
+    eigvals_0
+        Eigenvalues computed from matrix C1 in x direction.
+    P_0
+        Eigenvectors computed from matrix C1 in x direction.
+    eigvals_1
+        Eigenvalues computed from matrix C1 in y direction.
+    P_1
+        Eigenvectors computed from matrix C1 in y direction.
     """
     K = lr.U @ lr.S
 
@@ -607,6 +716,15 @@ def computeC(lr, grid, dimensions="1x1d"):
     Compute C coefficient.
 
     For higher dimensional simulations set i.e. dimensions = "2x1d"
+
+    Parameters
+    ----------
+    lr
+        Current low rank structure.
+    grid
+        Grid class.
+    dimensions
+        Can be chosen "1x1d" or "2x1d".
     """
     if dimensions == "1x1d":
         C1 = (lr.V.T @ np.diag(grid.MU) @ lr.V) * grid.dmu
@@ -632,6 +750,15 @@ def computeB(L, grid, dimensions="1x1d"):
     Compute B coeffiecient.
 
     For higher dimensional simulations set i.e. dimensions = "2x1d"
+
+    Parameters
+    ----------
+    L
+        Current matrix L of low rank structure.
+    grid
+        Grid class.
+    dimensions
+        Can be chosen "1x1d" or "2x1d".
     """
     if dimensions == "1x1d":
         B1 = (L.T @ np.ones((grid.Nmu, 1))).T * grid.dmu
@@ -660,8 +787,29 @@ def computeD(
     leave the standard value F_b = None.
     For 1x1d simulations, to compute D coefficient for inflow simulations, set F_b.
     For higher dimensional simulations set i.e. dimensions = "2x1d".
-    For higher dimensional simulation with domain decomp set option_dd = "dd" and 
-    set F_b(F_b_X) and F_b_Y.
+    For higher dimensional simulation with domain decomp (and thus inflow values) 
+    set option_dd = "dd" and set F_b(F_b_X) and F_b_Y.
+
+    Parameters
+    ----------
+    lr
+        Current low rank structure.
+    grid
+        Grid class.
+    F_b
+        Boundary values for 1x1d or boundary values in x for 2x1d, given as matrix.
+    F_b_Y
+        Boundary values in y for 2x1d, given as matrix.
+    DX
+        Centered differences matrix in x direction for 2x1d.
+    DY
+        Centered differences matrix in y direction for 2x1d.
+    dimensions
+        Can be chosen "1x1d" or "2x1d".
+    option_dd
+        Can be chosen "no_dd" or "dd".
+    option_coeff
+        Can be chosen "constant" or "space_dep".
     """
     if dimensions == "1x1d":
         if F_b is not None:
@@ -708,6 +856,16 @@ def computeD(
     return D1
 
 def computeE(lr, grid):
+    """
+    Compute E coeffiecient.
+
+    Parameters
+    ----------
+    lr
+        Current low rank structure.
+    grid
+        Grid class.
+    """
 
     E1_1 = lr.U.T @ grid.coeff[1] @ lr.U * grid.dx * grid.dy
     E1_2 = lr.U.T @ grid.coeff[2] @ lr.U * grid.dx * grid.dy
@@ -741,9 +899,52 @@ def Kstep(
     """
     K step of radiative transfer equation.
 
-    For K step for periodic simulations, leave the standard values inflow = False.
-    For K step for inflow simulations, set inflow = True.
-    For higher dimensional simulations set i.e. dimensions = "2x1d"
+    In 1x1d, for K step for periodic simulations, leave standard value inflow = False.
+    In 1x1d, for K step for inflow simulations, set inflow = True.
+    For higher dimensional simulations set i.e. dimensions = "2x1d".
+
+    Parameters
+    ----------
+    K
+        Current matrix K of low rank structure.
+    C1
+        C1 coefficient.
+    C2
+        C2 coefficient.
+    grid
+        Grid class.
+    lr
+        Current low rank structure.
+    F_b
+        Boundary values for 1x1d.
+    DX
+        Centered differences matrix in x direction for 2x1d.
+    DY
+        Centered differences matrix in y direction for 2x1d.
+    inflow
+        Can be chosen True or False (for 1x1d simulations).
+    dimensions
+        Can be chosen "1x1d" or "2x1d".
+    option_coeff
+        Can be chosen "constant" or "space_dep".
+    source
+        Source term for space dependent coefficient in 2x1d.
+    option_scheme
+        Can be chosen "cendiff" or "upwind".
+    DX_0
+        Upwind matrix in x direction for positive eigenvalues.
+    DX_1
+        Upwind matrix in x direction for negative eigenvalues.
+    DY_0
+        Upwind matrix in y direction for positive eigenvalues.
+    DY_1
+        Upwind matrix in y direction for negative eigenvalues.
+    option_bc
+        Can be chosen "standard", "lattice", "hohlraum" or "pointsource".
+    F_b_X
+        Boundary values in x for 2x1d, given as matrix.
+    F_b_Y
+        Boundary values in y for 2x1d, given as matrix.
     """
     if dimensions == "1x1d":
         if inflow:
@@ -863,9 +1064,36 @@ def Sstep(S, C1, C2, D1, grid, inflow=False,
     """
     S step of radiative transfer equation.
 
-    For S step for periodic simulations, leave the standard values inflow = False.
-    For S step for inflow simulations, set inflow = True.
+    In 1x1d, for S step for periodic simulations, leave standard values inflow = False.
+    In 1x1d, for S step for inflow simulations, set inflow = True.
     For higher dimensional simulations set i.e. dimensions = "2x1d"
+
+    Parameters
+    ----------
+    S
+        Current matrix S of low rank structure.
+    C1
+        C1 coefficient.
+    C2
+        C2 coefficient.
+    D1
+        D1 coefficient.
+    grid
+        Grid class.
+    inflow
+        Can be chosen True or False (for 1x1d simulations).
+    dimensions
+        Can be chosen "1x1d" or "2x1d".
+    option_coeff
+        Can be chosen "constant" or "space_dep".
+    E1
+        E1 coefficient in 2x1d.
+    source
+        Source term for space dependent coefficient in 2x1d.
+    lr
+        Current low rank structure.
+    option_bc
+        Can be chosen "standard", "lattice", "hohlraum" or "pointsource".
     """
     if dimensions == "1x1d":
         if not inflow:
@@ -922,9 +1150,34 @@ def Lstep(L, D1, B1, grid, lr=None, inflow=False,
     """
     L step of radiative transfer equation.
 
-    For L step for periodic simulations, leave the standard values inflow = False.
-    For L step for inflow simulations, set inflow = True.
+    In 1x1d, for L step for periodic simulations, leave standard values inflow = False.
+    In 1x1d, for L step for inflow simulations, set inflow = True.
     For higher dimensional simulations set i.e. dimensions = "2x1d".
+
+    Parameters
+    ----------
+    L
+        Current matrix L of low rank structure.
+    D1
+        D1 coefficient.
+    B1
+        B1 coefficient.
+    grid
+        Grid class.
+    lr
+        Current low rank structure.
+    inflow
+        Can be chosen True or False (for 1x1d simulations).
+    dimensions
+        Can be chosen "1x1d" or "2x1d".
+    option_coeff
+        Can be chosen "constant" or "space_dep".
+    E1
+        E1 coefficient in 2x1d.
+    source
+        Source term for space dependent coefficient in 2x1d.
+    option_bc
+        Can be chosen "standard", "lattice", "hohlraum" or "pointsource".
     """
     if dimensions == "1x1d":
         if inflow:
@@ -980,10 +1233,37 @@ def Lstep(L, D1, B1, grid, lr=None, inflow=False,
 def Kstep1(C1, grid, lr, F_b_X, F_b_Y, DX, DY, option_scheme="cendiff", 
            DX_0=None, DX_1=None, DY_0=None, DY_1=None):
     """
-    K step of radiative transfer equation.
+    K step of radiative transfer equation with equation splitting.
 
     Part of the K step associated to the x advection 
     after splitting the full equation in 2x1d.
+
+    Parameters
+    ----------
+    C1
+        C1 coefficient.
+    grid
+        Grid class.
+    lr
+        Current low rank structure.
+    F_b_X
+        Boundary values in x for 2x1d, given as matrix.
+    F_b_Y
+        Boundary values in y for 2x1d, given as matrix.
+    DX
+        Centered differences matrix in x direction.
+    DY
+        Centered differences matrix in y direction.
+    option_scheme
+        Can be chosen "cendiff" or "upwind".
+    DX_0
+        Upwind matrix in x direction for positive eigenvalues.
+    DX_1
+        Upwind matrix in x direction for negative eigenvalues.
+    DY_0
+        Upwind matrix in y direction for positive eigenvalues.
+    DY_1
+        Upwind matrix in y direction for negative eigenvalues.
     """
 
     K_bdry_left, K_bdry_right = computeK_bdry_2x1d_X(lr, grid, F_b_X)
@@ -1020,10 +1300,37 @@ def Kstep1(C1, grid, lr, F_b_X, F_b_Y, DX, DY, option_scheme="cendiff",
 def Kstep2(C1, grid, lr, F_b_X, F_b_Y, DX, DY, option_scheme="cendiff", 
            DX_0=None, DX_1=None, DY_0=None, DY_1=None):
     """
-    K step of radiative transfer equation.
+    K step of radiative transfer equation with equation splitting.
 
     Part of the K step associated to the y advection 
     after splitting the full equation in 2x1d.
+
+    Parameters
+    ----------
+    C1
+        C1 coefficient.
+    grid
+        Grid class.
+    lr
+        Current low rank structure.
+    F_b_X
+        Boundary values in x for 2x1d, given as matrix.
+    F_b_Y
+        Boundary values in y for 2x1d, given as matrix.
+    DX
+        Centered differences matrix in x direction.
+    DY
+        Centered differences matrix in y direction.
+    option_scheme
+        Can be chosen "cendiff" or "upwind".
+    DX_0
+        Upwind matrix in x direction for positive eigenvalues.
+    DX_1
+        Upwind matrix in x direction for negative eigenvalues.
+    DY_0
+        Upwind matrix in y direction for positive eigenvalues.
+    DY_1
+        Upwind matrix in y direction for negative eigenvalues.
     """
 
     K_bdry_left, K_bdry_right = computeK_bdry_2x1d_X(lr, grid, F_b_X)
@@ -1059,10 +1366,23 @@ def Kstep2(C1, grid, lr, F_b_X, F_b_Y, DX, DY, option_scheme="cendiff",
 
 def Kstep3(K, C2, grid, lr, source=None):
     """
-    K step of radiative transfer equation.
+    K step of radiative transfer equation with equation splitting.
 
     Part of the K step associated to the collision term 
     after splitting the full equation in 2x1d.
+
+    Parameters
+    ----------
+    K
+        Current matrix K of low rank structure.
+    C2
+        C2 coefficient.
+    grid
+        Grid class.
+    lr
+        Current low rank structure.
+    source
+        Source term for domain decomposition simulations.
     """
 
     if source is None:
@@ -1076,10 +1396,19 @@ def Kstep3(K, C2, grid, lr, source=None):
 
 def Sstep1(C1, D1, grid):
     """
-    S step of radiative transfer equation.
+    S step of radiative transfer equation with equation splitting.
 
     Part of the S step associated to the x advection 
     after splitting the full equation in 2x1d.
+
+    Parameters
+    ----------
+    C1
+        C1 coefficient.
+    D1
+        D1 coefficient.
+    grid
+        Grid class. 
     """
 
     rhs = (grid.coeff[0]) * D1[0] @ C1[0]
@@ -1089,10 +1418,19 @@ def Sstep1(C1, D1, grid):
 
 def Sstep2(C1, D1, grid):
     """
-    S step of radiative transfer equation.
+    S step of radiative transfer equation with equation splitting.
 
     Part of the S step associated to the y advection 
     after splitting the full equation in 2x1d.
+
+    Parameters
+    ----------
+    C1
+        C1 coefficient.
+    D1
+        D1 coefficient.
+    grid
+        Grid class.
     """
     rhs = (grid.coeff[0]) * D1[1] @ C1[1]
 
@@ -1101,10 +1439,23 @@ def Sstep2(C1, D1, grid):
 
 def Sstep3(S, C2, grid, lr, source=None):
     """
-    S step of radiative transfer equation.
+    S step of radiative transfer equation with equation splitting.
 
     Part of the S step associated to the collision term 
     after splitting the full equation in 2x1d.
+
+    Parameters
+    ----------
+    S
+        Current matrix S of low rank structure.
+    C2
+        C2 coefficient.
+    grid
+        Grid class.
+    lr
+        Current low rank structure.
+    source
+        Source term for domain decomposition simulations.
     """
 
     if source is None:
@@ -1118,10 +1469,19 @@ def Sstep3(S, C2, grid, lr, source=None):
 
 def Lstep1(lr, D1, grid):
     """
-    L step of radiative transfer equation.
+    L step of radiative transfer equation with equation splitting.
 
     Part of the L step associated to the x advection 
     after splitting the full equation in 2x1d.
+
+    Parameters
+    ----------
+    lr
+        Current low rank structure.
+    D1
+        D1 coefficient.
+    grid
+        Grid class.
     """
 
     rhs = -(grid.coeff[0]) * np.diag(np.cos(grid.PHI)) @ lr.V @ D1[0].T
@@ -1131,10 +1491,19 @@ def Lstep1(lr, D1, grid):
 
 def Lstep2(lr, D1, grid):
     """
-    L step of radiative transfer equation.
+    L step of radiative transfer equation with equation splitting.
 
     Part of the L step associated to the y advection 
     after splitting the full equation in 2x1d.
+
+    Parameters
+    ----------
+    lr
+        Current low rank structure.
+    D1
+        D1 coefficient.
+    grid
+        Grid class.
     """
 
     rhs = -(grid.coeff[0]) * np.diag(np.sin(grid.PHI)) @ lr.V @ D1[1].T
@@ -1144,10 +1513,23 @@ def Lstep2(lr, D1, grid):
 
 def Lstep3(L, B1, grid, lr, source=None):
     """
-    L step of radiative transfer equation.
+    L step of radiative transfer equation with equation splitting.
 
     Part of the L step associated to the collision term 
     after splitting the full equation in 2x1d.
+
+    Parameters
+    ----------
+    L
+        Current matrix L of low rank structure.
+    B1
+        B1 coefficient.
+    grid
+        Grid class.
+    lr
+        Current low rank structure.
+    source
+        Source term for domain decomposition simulations.
     """
 
     if source is None:
@@ -1171,6 +1553,19 @@ def add_basis_functions(
     Add basis functions according to the inflow condition of current subdomain 
     and a tolarance for singular values.
     For higher dimensional simulations set i.e. dimensions = "2x1d".
+
+    Parameters
+    ----------
+    lr
+        Current low rank structure.
+    grid
+        Grid class.
+    F_b
+        Boundary values, relevant for adding basis functions.
+    tol_sing_val
+        Tolerance for singular values.
+    dimensions
+        Can be chosen "1x1d" or "2x1d".
     """
     # Compute SVD and drop singular values
     X, sing_val, QT = np.linalg.svd(F_b, full_matrices=False)
@@ -1227,6 +1622,17 @@ def drop_basis_functions(lr, grid, drop_tol, min_rank : int = 5):
 
     Drop basis functions according to some drop tolerance, 
     such that the rank does not grow drastically.
+
+    Parameters
+    ----------
+    lr
+        Current low rank structure.
+    grid
+        Grid class.
+    drop_tol
+        Tolerance for dropping singular values.
+    min_rank
+        Minimum rank for the low rank structure.
     """
     U, sing_val, QT = np.linalg.svd(lr.S, full_matrices=False)
     r_prime = np.sum(sing_val > drop_tol * np.sqrt(grid.Nx*grid.Ny*grid.Nphi/
@@ -1245,9 +1651,20 @@ def drop_basis_functions(lr, grid, drop_tol, min_rank : int = 5):
 
 def rank_adaptivity_PSI(lr, grid, tol, min_rank : int = 5):
     """
-    Adapt rank.
+    Adaptive rank strategy.
 
     Rank adaptivity for PSI, when no inflow condition is given.
+
+    Parameters
+    ----------
+    lr
+        Current low rank structure.
+    grid
+        Grid class.
+    tol
+        Tolerance for singular values (add basis functions).
+    min_rank
+        Minimum rank for the low rank structure.
     """
     tol =  tol * np.sqrt(grid.Nx*grid.Ny*grid.Nphi/(grid.dx*grid.dy*grid.dphi))
     tol_drop = 0.1*tol

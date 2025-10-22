@@ -36,6 +36,15 @@ def RK4(f, rhs, dt):
     Runge Kutta 4.
 
     Time integration method.
+
+    Parameters
+    ----------
+    f
+        Matrix that needs to be integrated over time.
+    rhs
+        Right-hand side of function, given as lambda function.
+    dt
+        Time step size.
     """
     b_coeff = np.array([1.0 / 6.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 6.0])
 
@@ -56,11 +65,21 @@ def expl_Euler(f, rhs):
     Explicit Euler.
 
     Time integration method.
+
+    Parameters
+    ----------
+    f
+        Matrix that needs to be integrated over time.
+    rhs
+        Right-hand side of function, given as lambda function.
     """
 
     return rhs(f)
 
 def help_func_impl_Euler(x, f, rhs, dt):
+    """
+    Helper function for impl_Euler.
+    """
 
     x = x.reshape(f.shape)
 
@@ -73,6 +92,18 @@ def impl_Euler(f, rhs, dt, option = "impl_Euler"):
     Implicit Euler.
 
     Time integration method.
+    Using either krylov subspace method or GMRES.
+
+    Parameters
+    ----------
+    f
+        Matrix that needs to be integrated over time.
+    rhs
+        Right-hand side of function, given as lambda function.
+    dt
+        Time step size.
+    option
+        Can be chosen "impl_Euler" or "impl_Euler_gmres".
     """
     
     if option == "impl_Euler":
@@ -108,32 +139,32 @@ def PSI_lie(lr, grid, dt, F_b=None, DX=None, DY=None, dimensions="1x1d",
     """
     Projector splitting integrator with lie splitting.
 
-    To run periodic simulations, leave the standard value F_b = None.
-    To run inflow simulations, set F_b.
+    In 1x1d, to run periodic simulations, leave the standard value F_b = None.
+    In 1x1d, to run inflow simulations, set F_b.
     For higher dimensional simulations set i.e. dimensions = "2x1d"
 
     Parameters
     ----------
     lr
-        LR class of subdomain.
+        Low rank class of subdomain.
     grid
         Grid class of subdomain.
     dt
         Time step size.
     F_b
-        Boundary condition matrix for inflow conditions.
+        Boundary condition matrix for inflow conditions in 1x1d.
     DX
         Centered difference matrix in x.
     DY
         Centered difference matrix in y.
     dimensions
-        Number of dimensions, given as a string.
+        Can be chosen "1x1d" or "2x1d".
     option_coeff
-        Possible values are "constant" and "space_dep".
+        Can be chosen "constant" or "space_dep".
     source
         Source term in rt equation, if given.
     option_scheme
-        Possible options are "cendiff" or "upwind".
+        Can be chosen "cendiff" or "upwind".
     DX_0
         Upwind difference matrix in x (DX-).
     DX_1
@@ -143,13 +174,25 @@ def PSI_lie(lr, grid, dt, F_b=None, DX=None, DY=None, dimensions="1x1d",
     DY_1
         Upwind difference matrix in y (DY+).
     option_timescheme
-        Possible options are "RK4", "impl_Euler" or "impl_Euler_gmres".
+        Can be chosen "RK4", "impl_Euler" or "impl_Euler_gmres".
     option_bc
-        Set "lattice" or "hohlraum" for 1 domain simulations of those examples.
+        Set "lattice", "hohlraum" or "pointsource" for 1 domain simulations of examples.
     F_b_X
-        Boundary condition matrix for in X for 1 domain simulations.
+        Boundary condition matrix for X for 1 domain simulations.
     F_b_Y
-        Boundary condition matrix for in X for 1 domain simulations.
+        Boundary condition matrix for Y for 1 domain simulations.
+    tol_sing_val
+        Tolerance when adding basis functions.
+    drop_tol
+        Tolerance when removing basis functions.
+    min_rank
+        Minimum rank to be kept during rank adaptivity.
+    rank_adapted
+        Array of adapted ranks until this time.
+    rank_dropped
+        Array of dropped ranks until this time.
+    tol_lattice
+        Tolerance for rank adaptivity, when no inflow is given.
     """
     inflow = F_b is not None
 
@@ -267,23 +310,9 @@ def PSI_lie(lr, grid, dt, F_b=None, DX=None, DY=None, dimensions="1x1d",
 
 def PSI_strang(lr, grid, dt, t, F_b=None, DX=None, DY=None):
     """
-    Projector splitting integrator with strang splitting.
+    Old version of Projector splitting integrator with strang splitting.
 
-    To run periodic simulations, leave the standard value F_b = None.
-    To run inflow simulations, set F_b.
-
-    Parameters
-    ----------
-    lr
-        LR class of subdomain.
-    grid
-        Grid class of subdomain.
-    dt
-        Time step size.
-    t
-        Current time.
-    F_b
-        Boundary condition matrix for inflow conditions.
+    Not used anymore, only kept for further development.
     """
     inflow = F_b is not None
 
@@ -375,9 +404,9 @@ def PSI_splitting_lie(
     dt
         Time step size.
     F_b
-        Boundary condition matrix for inflow conditions.
+        Boundary condition matrix for inflow conditions in x.
     F_b_top_bottom
-        Boundary condition matrix for inflow conditions.
+        Boundary condition matrix for inflow conditions in y.
     DX
         Centered difference matrix in x of subdomain.
     DY
@@ -563,22 +592,10 @@ def PSI_splitting_strang(
     rank_dropped=None,
 ):
     """
-    Projector splitting integrator with equation splitting and strang splitting.
+    Old version of Projector splitting integrator with equation splitting and 
+    strang splitting.
 
-    For simulations in 2x1d and DD, together with a splitting approach.
-
-    Parameters
-    ----------
-    lr
-        LR class of subdomain.
-    grid
-        Grid class of subdomain.
-    dt
-        Time step size.
-    F_b
-        Boundary condition matrix for inflow conditions.
-    F_b_top_bottom
-        Boundary condition matrix for inflow conditions.
+    Not used anymore, only kept for further development.
     """
 
     # ToDo: Still need to add domain decomposition in Y to strang splitting, 

@@ -1,5 +1,5 @@
 """
-Contains functions like mass computation.
+Contains helper functions.
 """
 
 import matplotlib.colors as colors
@@ -15,6 +15,16 @@ from DLR_rt.src.grid import Grid_2x1d
 
 
 def compute_mass(lr, grid):
+    """
+    Compute mass from low rank representation.
+
+    Parameters
+    ----------
+    lr
+        Low rank representation.
+    grid
+        Grid class.
+    """
     K = lr.U @ lr.S
     rho = K @ np.trapezoid(lr.V, dx=grid.dmu, axis=0).T
     M = np.trapezoid(rho, dx=grid.dx, axis=0)
@@ -26,14 +36,14 @@ def computeD_cendiff_2x1d(grid: Grid_2x1d, option_dd: str = "no_dd"):
     Compute centered difference matrices.
 
     Compute centered difference matrices for 2x1d with or without domain decmoposition.
-    Output is DX and DY.
+    For option_dd = "no_dd", periodic bc are chosen. Output is DX and DY.
 
     Parameters
     ----------
     grid
         Grid class of subdomain
     option_dd : str
-        Can be chosen either "dd" or "no_dd"
+        Can be chosen either "dd", "no_dd" or "outflow".
     """
     ### Compute DX
     # Step 1: Set up cen difference matrix
@@ -93,7 +103,8 @@ def computeD_upwind_2x1d(grid: Grid_2x1d, option_dd: str = "no_dd"):
     """
     Compute upwind difference matrices.
 
-    Compute upwind difference matrices for 2x1d with or without domain decmoposition.
+    Compute upwind difference matrices for 2x1d with or without domain decomposition.
+    For option_dd = "no_dd", periodic bc are chosen.
     Output is DX_0 (DX-),  DX_1 (DX+), DY_0 (DY-) and DY_1 (DY+).
 
     Parameters
@@ -101,7 +112,7 @@ def computeD_upwind_2x1d(grid: Grid_2x1d, option_dd: str = "no_dd"):
     grid
         Grid class of subdomain
     option_dd : str
-        Can be chosen either "dd" or "no_dd"
+        Can be chosen either "dd", "no_dd" or "outflow".
     """
     ### Compute DX_0
     # Step 1: Set up upwind matrix
@@ -201,6 +212,23 @@ def plot_rho_subgrids(subgrids, lr_on_subgrids, fs = 26, savepath = "plots/", t 
     Plot rho over x and y.
 
     Generate a colorplot of rho for simulation done on subgrids.
+
+    Parameters
+    ----------
+    subgrids
+        Grid classes on subdomains.
+    lr_on_subgrids
+        Low rank representation on subgrids.
+    fs
+        Font size for plot.
+    savepath
+        Path to save the plot.
+    t
+        Time for which plot is generated.
+    plot_option
+        Can be "normal" or "log", decides on type of color scale.
+    plot_name_add
+        Additional string to add to plot names.
     """
 
     ### Build rho matrix
@@ -298,6 +326,30 @@ def plot_ranks_subgrids(subgrids, time,
                         rank_on_subgrids_adapted, rank_on_subgrids_dropped, 
                         fs = 26, savepath = "plots/", option = "lattice",
                         plot_name_add = ""):
+    """
+    Plot ranks on subgrids.
+
+    Generate plots for rank evolution on subgrids as well as final ranks.
+
+    Parameters
+    ----------
+    subgrids
+        Grid classes on subdomains.
+    time
+        Time vector.
+    rank_on_subgrids_adapted
+        Adapted ranks on subgrids (vector for each subgrid).
+    rank_on_subgrids_dropped
+        Dropped ranks on subgrids (vector for each subgrid).
+    fs
+        Font size for plot.
+    savepath
+        Path to save the plot.
+    option
+        Can be "lattice" or "hohlraum", decides on type of final rank plot.
+    plot_name_add
+        Additional string to add to plot names.
+    """
     
     ### Plot for rank over time
 
@@ -462,11 +514,26 @@ def plot_ranks_subgrids(subgrids, time,
     return
 
 def plot_rho_onedomain(grid, lr, fs = 26, savepath = "plots/", t = 0.0, 
-                      plot_option = "log", plot_name_add = ""):
+                      plot_name_add = ""):
     """
     Plot rho over x and y.
 
     Generate a colorplot of rho for simulation done on one domain.
+
+    Parameters
+    ----------
+    grid
+        Grid class.
+    lr
+        Low rank representation.
+    fs
+        Font size for plot.
+    savepath
+        Path to save the plot.
+    t
+        Time for which plot is generated.
+    plot_name_add
+        Additional string to add to plot names.
     """
 
     f = lr.U @ lr.S @ lr.V.T
@@ -521,6 +588,18 @@ def plot_rho_onedomain(grid, lr, fs = 26, savepath = "plots/", t = 0.0,
     return
 
 def generate_full_f(lr_on_subgrids, subgrids, grid):
+    """
+    Generate full f from low rank representations on subgrids.
+
+    Parameters
+    ----------
+    lr_on_subgrids
+        Low rank representations on subgrids.
+    subgrids
+        Grid classes on subdomains.
+    grid
+        Grid class for full domain.
+    """
 
     n_split_x = subgrids[0][0].n_split_x
     n_split_y = subgrids[0][0].n_split_y
@@ -554,6 +633,20 @@ def generate_full_f(lr_on_subgrids, subgrids, grid):
     return f_dd
 
 def setup_coeff_source_1domain(Nx, Ny, option_bc):
+    """
+    Setup scattering, transport and advection coefficients as well as source.
+
+    Setup according to test case.
+
+    Parameters
+    ----------
+    Nx
+        Number of grid points in x.
+    Ny
+        Number of grid points in y.
+    option_bc : str
+        Can be chosen either "lattice", "hohlraum" or "pointsource".
+    """
 
     if option_bc == "lattice":
         ### Full lattice setup

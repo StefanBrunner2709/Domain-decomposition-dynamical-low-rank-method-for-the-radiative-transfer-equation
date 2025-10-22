@@ -106,8 +106,8 @@ class Grid_2x1d:
 
     Helps to generate an equidistant grid. For calculations with or without 
     domain decomposition and periodic boundary conditions.
-    Angle domain is set from [0, 2*pi]. Spacial domain is [0,1]x[0,1].
-    For simulations with domain decomposition set _option_dd to dd
+    Angular domain is set from [0, 2*pi]. Spatial domain is [0,1]x[0,1].
+    To have point 0 and 1 not on the grid, use option_dd = "dd".
 
     Parameters
     ----------
@@ -189,10 +189,10 @@ class Grid_2x1d:
         Parameters
         ----------
         _coeff_left
-            1/epsilon for radiative transfer equation on left subdomain. 
+            Array of coefficients for radiative transfer equation on left subdomain. 
             If None, value from whole domain is taken.
         _coeff_right
-            1/epsilon for radiative transfer equation on right subdomain. 
+            Array of coefficients for radiative transfer equation on right subdomain. 
             If None, value from whole domain is taken.
         """
         if _coeff_left is None:
@@ -238,10 +238,10 @@ class Grid_2x1d:
         Parameters
         ----------
         _coeff_bottom
-            1/epsilon for radiative transfer equation on bottom subdomain. 
+            Array of coefficients for radiative transfer equation on bottom subdomain. 
             If None, value from whole domain is taken.
         _coeff_top
-            1/epsilon for radiative transfer equation on top subdomain. 
+            Array of coefficients for radiative transfer equation on top subdomain. 
             If None, value from whole domain is taken.
         """
         if _coeff_bottom is None:
@@ -277,22 +277,24 @@ class Grid_2x1d:
 
         return bottom_grid, top_grid
 
-    def split_grid_into_subgrids(self, n_split_x: int = 8, n_split_y: int = 8, 
+    def split_grid_into_subgrids(self, n_split_x: int = 7, n_split_y: int = 7, 
                                  option_coeff: str = "standard", 
                                  option_split: str = "equidistant"):
         """
         Split a Grid_2x1d object into smaller subgrids.
 
-        Can be used for generating the grid of the lattice example.
+        Can be used for generating the grid of the lattice and hohlraum example.
 
         Parameters
         ----------
         n_split_x : int
-            Number of subgrids along x-direction (default = 8).
+            Number of subgrids along x-direction, if equidistant.
         n_split_y : int
-            Number of subgrids along y-direction (default = 8).
+            Number of subgrids along y-direction, if equidistant.
         option_coeff : str
-            Set lattice for lattice grid 8x8.
+            Set lattice for lattice grid 7x7.
+        option_split : str
+            Can be chosen "equidistant" or "hohlraum".
 
         Returns
         -------

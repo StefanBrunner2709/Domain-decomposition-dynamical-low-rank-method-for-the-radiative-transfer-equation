@@ -22,6 +22,36 @@ def integrate_dd_hohlraum(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                           option_scheme: str = "cendiff", 
                           option_problem : str = "hohlraum", 
                           snapshots: int = 2, plot_name_add = ""):
+    """
+    Integrate low rank structure for hohlraum setup with domain decomposition.
+
+    Can be used for either hohlraum or pointsource simulations. Integrations is done 
+    according to evolution equations obtained after splitting the radiative transfer 
+    equation.
+
+    Parameters
+    ----------
+    lr0_on_subgrids
+        Low rank structures on subdomains at initial time.
+    subgrids
+        Grid classes on subdomains.
+    t_f
+        Final time.
+    dt
+        Time step size.
+    tol_sing_val
+        Tolerance for add basis function step.
+    drop_tol
+        Tolerance for drop basis function step.
+    option_scheme
+        Can be chosen "cendiff" or "upwind".
+    option_problem
+        Can be chosen "hohlraum" or "pointsource".
+    snapshots
+        Number of snapshots to be taken (including initial and final time).
+    plot_name_add
+        Additional string to add to plot names.
+    """
     
     lr_on_subgrids = lr0_on_subgrids
     t = 0
@@ -234,6 +264,35 @@ def integrate_dd_lattice(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                          option_scheme: str = "cendiff", 
                          option_timescheme : str = "RK4", 
                          snapshots: int = 2, plot_name_add = ""):
+    """
+    Integrate low rank structure for lattice setup with domain decomposition.
+
+    Can be used for lattice simulations. Integrations is done according to evolution 
+    equations obtained after splitting the radiative transfer equation.
+
+    Parameters
+    ----------
+    lr0_on_subgrids
+        Low rank structures on subdomains at initial time.
+    subgrids
+        Grid classes on subdomains.
+    t_f
+        Final time.
+    dt
+        Time step size.
+    tol_sing_val
+        Tolerance for add basis function step.
+    drop_tol
+        Tolerance for drop basis function step.
+    option_scheme
+        Can be chosen "cendiff" or "upwind".
+    option_timescheme
+        Can be chosen "RK4", "impl_Euler" or "impl_Euler_gmres".
+    snapshots
+        Number of snapshots to be taken (including initial and final time).
+    plot_name_add
+        Additional string to add to plot names.
+    """
     
     lr_on_subgrids = lr0_on_subgrids
     t = 0
@@ -405,7 +464,43 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
               option_scheme : str = "cendiff", option_timescheme : str = "RK4",
               option_bc : str = "standard", tol_sing_val = 1e-2, drop_tol = 1e-3, 
               tol_lattice = 1e-5, snapshots: int = 2, plot_name_add = ""):
-    
+    """
+    Integrate low rank structure on 1 domain.
+
+    Can be used for lattice, hohlraum and pointsource simulations. Integrations is done 
+    according to evolution equations for the radiative transfer equation.
+
+    Parameters
+    ----------
+    lr0
+        Low rank structure at initial time.
+    grid
+        Grid class.
+    t_f
+        Final time.
+    dt
+        Time step size.
+    option
+        Can be chosen "lie".
+    source
+        Source term in rt equation, if given.
+    option_scheme
+        Can be chosen "cendiff" or "upwind".
+    option_timescheme
+        Can be chosen "RK4", "impl_Euler" or "impl_Euler_gmres".
+    option_bc
+        Can be chosen "standard", "lattice", "hohlraum" or "pointsource".
+    tol_sing_val
+        Tolerance for add basis function step.
+    drop_tol
+        Tolerance for drop basis function step.
+    tol_lattice
+        Tolerance for rank adaptation without inflow conditions in lattice setup.
+    snapshots
+        Number of snapshots to be taken (including initial and final time).
+    plot_name_add
+        Additional string to add to plot names.
+    """
     min_rank = grid.r
 
     if option_bc == "lattice" or option_bc == "hohlraum" or option_bc == "pointsource":

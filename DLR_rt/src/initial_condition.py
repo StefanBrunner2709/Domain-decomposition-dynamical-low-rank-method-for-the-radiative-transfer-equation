@@ -12,7 +12,14 @@ def setInitialCondition_1x1d_full(grid: Grid_1x1d, sigma: float = 1.0) -> np.nda
     """
     Set initial condition.
 
-    Set initial condition for full grid with periodic boundary conditions.
+    Set initial condition for 1x1d and full grid with periodic boundary conditions.
+
+    Parameters
+    ----------
+    grid
+        Grid class.
+    sigma
+        Standard deviation of Gaussian.
     """
     f0 = np.zeros((grid.Nx, grid.Nmu))
     xx = 1 / (2 * np.pi * sigma**2) * np.exp(-((grid.X - 0.5) ** 2) / (2 * sigma**2))
@@ -25,8 +32,16 @@ def setInitialCondition_1x1d_lr(grid: Grid_1x1d, sigma: float = 1.0):
     """
     Set initial condition.
 
-    Set initial condition for low rank grid with periodic or inflow boundary conditions.
+    Set initial condition 1x1d and low rank grid with periodic or inflow boundary 
+    conditions.
     Boundary conditions are determined according to the boundary conditions in grid.
+
+    Parameters
+    ----------
+    grid
+        Grid class.
+    sigma
+        Standard deviation of Gaussian.
     """
     S = np.zeros((grid.r, grid.r))
 
@@ -54,38 +69,21 @@ def setInitialCondition_2x1d_lr(grid: Grid_2x1d, option_cond: str = "standard"):
     """
     Set initial condition.
 
-    Set initial condition for 2x1d low rank grid with or without domain decomposition 
-    and periodic boundary conditions.
-    Set option_cond = "lattice" for lattice grid simulation.
+    Set initial condition for 2x1d low rank grid without domain decomposition.
+    Set option_cond = "lattice" for almost 0 initial condition.
+
+    Parameters
+    ----------
+    grid
+        Grid class.
+    option_cond
+        Can be chosen "standard", "lattice" or "f_direct".
     """
     S = np.zeros((grid.r, grid.r))
     U = np.zeros((grid.Nx * grid.Ny, grid.r))
     V = np.zeros((grid.Nphi, grid.r))
 
     if option_cond == "standard":
-
-        # # Start with all zeros
-        # block_matrix = np.zeros((7, 7))
-        # # Set block (4,4) to 1
-        # block_row = 3
-        # block_col = 3
-        # block_matrix[block_row, block_col] = 1000
-        # # Expand to full matrix
-        # block_init = np.kron(block_matrix, np.ones((int(grid.Nx/7), int(grid.Ny/7))))
-        # U[:,0] = block_init.flatten()
-
-        # # Do sinus init
-        # block_size = int(grid.Nx/7)
-        # init = np.zeros((grid.Nx,grid.Ny))
-        # for i in range(3*block_size, 4*block_size):
-        #     for j in range(3*block_size, 4*block_size):
-        #         init[i,j] = 1000 * (
-        #                         np.sin((grid.X[i] - 3*block_size/grid.Nx) 
-        #                                * grid.Nx/block_size * np.pi)
-        #                         * np.sin((grid.Y[j] - 3*block_size/grid.Ny) 
-        #                                 * grid.Ny/block_size * np.pi)
-        #                     )
-        # U[:,0] = init.flatten()
 
         for i in range(grid.Ny):
             U[i * grid.Nx : (i + 1) * grid.Nx, 0] = (
@@ -132,6 +130,20 @@ def setInitialCondition_2x1d_lr(grid: Grid_2x1d, option_cond: str = "standard"):
 
 
 def setInitialCondition_2x1d_lr_subgrids(subgrids, option_cond: str = "standard"):
+    """
+    Set initial condition.
+
+    Set initial condition for 2x1d low rank simulation with domain decomposition 
+    on subgrids.
+    Set option_cond = "lattice" for almost 0 initial condition.
+
+    Parameters
+    ----------
+    subgrids
+        Grid classes on subdomains.
+    option_cond
+        Can be chosen "standard" or "lattice".
+    """
 
     n_split_x = subgrids[0][0].n_split_x
     n_split_y = subgrids[0][0].n_split_y
