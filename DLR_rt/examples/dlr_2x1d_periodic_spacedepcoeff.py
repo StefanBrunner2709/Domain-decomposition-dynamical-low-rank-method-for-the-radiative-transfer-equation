@@ -1,3 +1,5 @@
+import matplotlib
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -68,8 +70,41 @@ axes.set_xticks([0, 0.5, 1])
 axes.set_yticks([0, 0.5, 1])
 axes.tick_params(axis="both", labelsize=fs, pad=10)
 
+cmap = matplotlib.colormaps.get_cmap('jet')
+
+if option_bc == "lattice":
+    x_edges = np.linspace(extent[0], extent[1], 8)
+    y_edges = np.linspace(extent[2], extent[3], 8)
+    blue_patch = mpatches.Patch(color=cmap(0.0), label=r'$c_{\text{s}}=1$'  
+                                + '\n' +  r'$c_{\text{t}}=1$')
+    red_patch = mpatches.Patch(color=cmap(1.0), label=r'$c_{\text{s}}=0$'  
+                               + '\n' +  r'$c_{\text{t}}=10$')
+
+else:
+    x_edges = [0, 0.05, 0.25, 0.75, 0.95, 1]
+    y_edges = [0, 0.05, 0.25, 0.75, 0.95, 1]
+    blue_patch = mpatches.Patch(color=cmap(0.0), label=r'$c_{\text{s}}=0$'  
+                                + '\n' +  r'$c_{\text{t}}=0$')
+    red_patch = mpatches.Patch(color=cmap(1.0), label=r'$c_{\text{s}}=0$'  
+                               + '\n' +  r'$c_{\text{t}}=100$')
+
+for x in x_edges:
+    axes.axvline(x=x, color='white', linewidth=0.5)
+for y in y_edges:
+    axes.axhline(y=y, color='white', linewidth=0.5)
+
+axes.set_axisbelow(False)
+
+axes.legend(
+    handles=[blue_patch, red_patch],
+    loc='upper left',           # anchor legend to the left side of the bbox
+    bbox_to_anchor=(1.05, 1.0),  # (x, y) — place it just outside the axes
+    fontsize=fs,
+    labelspacing=1.0,
+)
+
 plt.tight_layout()
-plt.savefig(savepath + "lattice1.pdf")
+plt.savefig(savepath + "lattice1.pdf", bbox_inches="tight")
 
 ### Plot source
 extent = [grid.X[0], grid.X[-1], grid.Y[0], grid.Y[-1]]
@@ -83,8 +118,22 @@ axes.set_xticks([0, 0.5, 1])
 axes.set_yticks([0, 0.5, 1])
 axes.tick_params(axis="both", labelsize=fs, pad=10)
 
+cmap = matplotlib.colormaps.get_cmap('viridis')
+
+if option_bc == "lattice":
+    purple_patch = mpatches.Patch(color=cmap(0.0), label=r'$Q(x,y)=0$')
+    yellow_patch = mpatches.Patch(color=cmap(1.0), label=r'$Q(x,y)=1$')
+
+    axes.legend(
+        handles=[purple_patch, yellow_patch],
+        loc='upper left',           # anchor legend to the left side of the bbox
+        bbox_to_anchor=(1.05, 1.0),  # (x, y) — place it just outside the axes
+        fontsize=fs,
+        labelspacing=1.0,
+    )
+
 plt.tight_layout()
-plt.savefig(savepath + "source.pdf")
+plt.savefig(savepath + "source.pdf", bbox_inches="tight")
 
 # Prepare source for code
 source = source.flatten()[:, None]
