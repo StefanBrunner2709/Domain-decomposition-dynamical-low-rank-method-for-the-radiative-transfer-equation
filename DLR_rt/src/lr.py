@@ -1616,6 +1616,78 @@ def add_basis_functions(
     return lr, grid
 
 
+def add_basis_functions_v2(
+    lr, grid, F_b, tol_int
+):
+    """
+    Add basis functions.
+
+    Add basis functions according to the inflow condition of current subdomain 
+    and a tolarance for singular values.
+    The truncation is done after adding basis function in V.
+
+    Parameters
+    ----------
+    lr
+        Current low rank structure.
+    grid
+        Grid class.
+    F_b
+        Boundary values, relevant for adding basis functions.
+    tol_int
+        Tolerance for singular values.
+    """
+
+    # Perform SVD
+    U_b, sing_val, V_bT = np.linalg.svd(F_b, full_matrices=False)
+    V_b = V_bT.T
+    Sigma_b = np.diag(sing_val)
+
+    #Form L_h
+    L = lr.V @ lr.S.T
+    L_b = V_b @ Sigma_b.T
+    L_h = np.concatenate((L, L_b), axis=1)
+
+    # Truncate according to tol_int
+    U_L, sing_val_L, V_LT = np.linalg.svd(L_h.T, full_matrices=False)
+    r_t = np.sum(sing_val_L > tol_int * np.sqrt(grid.Nx*grid.Ny*grid.Nphi/
+                                                   (grid.dx*grid.dy*grid.dphi)))
+    if r_t < grid.r:
+        r_t = grid.r
+    if r_t > grid.Nphi:
+        r_t = grid.Nphi
+
+    r_b = r_t - grid.r
+    V_b = V_bT.T[:, :r_b]
+    lr.V = np.concatenate((lr.V, V_b), axis=1)
+
+    # lr.V = V_LT.T[:, :r_t]
+
+    # Extend S and U accordingly
+    if r_t > grid.r:
+        S_extended = np.zeros((r_t, r_t))
+        S_extended[: grid.r, : grid.r] = lr.S
+        lr.S = S_extended
+
+        X_h = np.random.rand(grid.Nx * grid.Ny, r_t - grid.r)
+        lr.U = np.concatenate((lr.U, X_h), axis=1)
+
+    # Do QR decompositions
+    lr.U, R_U = np.linalg.qr(lr.U, mode="reduced")
+    lr.U /= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
+    R_U *= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
+
+    lr.V, R_V = np.linalg.qr(lr.V, mode="reduced")
+    lr.V /= np.sqrt(grid.dphi)
+    R_V *= np.sqrt(grid.dphi)
+
+    lr.S = R_U @ lr.S @ R_V.T
+
+    grid.r = r_t
+
+    return lr, grid
+
+
 def drop_basis_functions(lr, grid, drop_tol, min_rank : int = 5):
     """
     Drop basis functions.

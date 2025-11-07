@@ -21,7 +21,8 @@ def integrate_dd_hohlraum(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                           tol_sing_val: float = 1e-3, drop_tol: float = 1e-7, 
                           option_scheme: str = "cendiff", 
                           option_problem : str = "hohlraum", 
-                          snapshots: int = 2, plot_name_add = ""):
+                          snapshots: int = 2, plot_name_add = "",
+                          option_rank_adaptivity: str = "v1"):
     """
     Integrate low rank structure for hohlraum setup with domain decomposition.
 
@@ -51,6 +52,8 @@ def integrate_dd_hohlraum(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
         Number of snapshots to be taken (including initial and final time).
     plot_name_add
         Additional string to add to plot names.
+    option_rank_adaptivity
+        Possible options are "v1" or "v2".
     """
     
     lr_on_subgrids = lr0_on_subgrids
@@ -241,7 +244,8 @@ def integrate_dd_hohlraum(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                         DX_0=D_on_subgrids[j][i][2], 
                         DX_1=D_on_subgrids[j][i][3], 
                         DY_0=D_on_subgrids[j][i][4], 
-                        DY_1=D_on_subgrids[j][i][5]
+                        DY_1=D_on_subgrids[j][i][5],
+                        option_rank_adaptivity=option_rank_adaptivity
                     )
 
             ### Update time
@@ -263,7 +267,8 @@ def integrate_dd_lattice(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                          tol_sing_val: float = 1e-3, drop_tol: float = 1e-7,
                          option_scheme: str = "cendiff", 
                          option_timescheme : str = "RK4", 
-                         snapshots: int = 2, plot_name_add = ""):
+                         snapshots: int = 2, plot_name_add = "",
+                         option_rank_adaptivity: str = "v1"):
     """
     Integrate low rank structure for lattice setup with domain decomposition.
 
@@ -292,6 +297,8 @@ def integrate_dd_lattice(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
         Number of snapshots to be taken (including initial and final time).
     plot_name_add
         Additional string to add to plot names.
+    option_rank_adaptivity
+        Possible options are "v1" or "v2".
     """
     
     lr_on_subgrids = lr0_on_subgrids
@@ -443,7 +450,8 @@ def integrate_dd_lattice(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                         source=source,
                         option_scheme=option_scheme, 
                         DX_0=DX_0, DX_1=DX_1, DY_0=DY_0, DY_1=DY_1,
-                        option_timescheme=option_timescheme
+                        option_timescheme=option_timescheme,
+                        option_rank_adaptivity=option_rank_adaptivity
                     )
 
             ### Update time
@@ -463,7 +471,8 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
               option: str = "lie", source = None, 
               option_scheme : str = "cendiff", option_timescheme : str = "RK4",
               option_bc : str = "standard", tol_sing_val = 1e-2, drop_tol = 1e-3, 
-              tol_lattice = 1e-5, snapshots: int = 2, plot_name_add = ""):
+              tol_lattice = 1e-5, snapshots: int = 2, plot_name_add = "",
+              option_rank_adaptivity: str = "v1"):
     """
     Integrate low rank structure on 1 domain.
 
@@ -500,6 +509,8 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
         Number of snapshots to be taken (including initial and final time).
     plot_name_add
         Additional string to add to plot names.
+    option_rank_adaptivity
+        Possible options are "v1" or "v2".
     """
     min_rank = grid.r
 
@@ -565,7 +576,8 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
                                    tol_sing_val=tol_sing_val, drop_tol=drop_tol, 
                                    min_rank=min_rank, 
                                    rank_adapted=rank_adapted, rank_dropped=rank_dropped,
-                                   tol_lattice=tol_lattice)
+                                   tol_lattice=tol_lattice, 
+                                   option_rank_adaptivity=option_rank_adaptivity)
 
             t += dt
             time.append(t)

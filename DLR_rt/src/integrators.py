@@ -20,6 +20,7 @@ from DLR_rt.src.lr import (
     Sstep2,
     Sstep3,
     add_basis_functions,
+    add_basis_functions_v2,
     computeB,
     computeC,
     computeD,
@@ -135,7 +136,8 @@ def PSI_lie(lr, grid, dt, F_b=None, DX=None, DY=None, dimensions="1x1d",
             DX_0=None, DX_1=None, DY_0=None, DY_1=None, option_timescheme="RK4",
             option_bc="standard", F_b_X=None, F_b_Y=None,
             tol_sing_val=None, drop_tol=None, min_rank=5,
-            rank_adapted=None, rank_dropped=None, tol_lattice=None):
+            rank_adapted=None, rank_dropped=None, tol_lattice=None,
+            option_rank_adaptivity="v1"):
     """
     Projector splitting integrator with lie splitting.
 
@@ -193,14 +195,21 @@ def PSI_lie(lr, grid, dt, F_b=None, DX=None, DY=None, dimensions="1x1d",
         Array of dropped ranks until this time.
     tol_lattice
         Tolerance for rank adaptivity, when no inflow is given.
+    option_rank_adaptivity
+        Possible options are "v1" or "v2".
     """
     inflow = F_b is not None
 
     # Add basis functions
     if option_bc == "hohlraum" or option_bc == "pointsource":
-        lr, grid = add_basis_functions(
-            lr, grid, F_b_X, tol_sing_val, dimensions="2x1d"
-        )   # Add basis functions for F_b_X
+        if option_rank_adaptivity == "v1":
+            lr, grid = add_basis_functions(
+                lr, grid, F_b_X, tol_sing_val, dimensions="2x1d"
+            )
+        else:
+            lr, grid = add_basis_functions_v2(
+                lr, grid, F_b_X, drop_tol
+            )
     if option_bc == "lattice":
         lr, grid = rank_adaptivity_PSI(lr, grid, tol=tol_lattice, min_rank=min_rank)
     if (option_bc == "lattice" or option_bc == "hohlraum" 
@@ -388,7 +397,8 @@ def PSI_splitting_lie(
     DX_1=None, 
     DY_0=None, 
     DY_1=None,
-    option_timescheme="RK4"
+    option_timescheme="RK4",
+    option_rank_adaptivity="v1",
 ):
     """
     Projector splitting integrator with equation splitting and lie splitting.
@@ -433,15 +443,22 @@ def PSI_splitting_lie(
         Upwind difference matrix in y (DY+) of subdomain.
     option_timescheme
         Possible options are "RK4", "impl_Euler" or "impl_Euler_gmres".
-
+    option_rank_adaptivity
+        Possible options are "v1" or "v2".
     """
 
     # Step 1: advection in x
 
     ### Add basis for adaptive rank strategy:
-    lr, grid = add_basis_functions(
-        lr, grid, F_b, tol_sing_val, dimensions="2x1d"
-    )
+    if option_rank_adaptivity == "v1":
+        lr, grid = add_basis_functions(
+            lr, grid, F_b, tol_sing_val, dimensions="2x1d"
+        )
+    else:
+        lr, grid = add_basis_functions_v2(
+            lr, grid, F_b, drop_tol
+        )
+
 
     if rank_adapted is not None:
         rank_adapted.append(grid.r)
@@ -494,9 +511,14 @@ def PSI_splitting_lie(
     # Step 2: advection in y
 
     ### Add basis for adaptive rank strategy:
-    lr, grid = add_basis_functions(
-        lr, grid, F_b_top_bottom, tol_sing_val, dimensions="2x1d"
-    )
+    if option_rank_adaptivity == "v1":
+        lr, grid = add_basis_functions(
+            lr, grid, F_b_top_bottom, tol_sing_val, dimensions="2x1d"
+        )
+    else:
+        lr, grid = add_basis_functions_v2(
+            lr, grid, F_b_top_bottom, drop_tol
+        )
 
     # K step
     C1, C2 = computeC(lr, grid, dimensions="2x1d")

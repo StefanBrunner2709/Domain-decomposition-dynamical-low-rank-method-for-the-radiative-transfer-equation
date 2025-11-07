@@ -26,6 +26,7 @@ savepath = "plots/"
 method = "lie"
 option_scheme = "upwind"
 option_timescheme = "RK4"
+option_rank_adaptivity = "v2"
 
 option_error_estimate = True
 
@@ -47,7 +48,8 @@ lr0_on_subgrids = setInitialCondition_2x1d_lr_subgrids(subgrids, option_cond="la
  rank_on_subgrids_adapted, rank_on_subgrids_dropped) = integrate_dd_lattice(
     lr0_on_subgrids, subgrids, t_f, dt, 
     option_scheme=option_scheme, option_timescheme=option_timescheme,
-    tol_sing_val=tol_sing_val, drop_tol=drop_tol, snapshots=snapshots
+    tol_sing_val=tol_sing_val, drop_tol=drop_tol, snapshots=snapshots, 
+    option_rank_adaptivity=option_rank_adaptivity
     )
 
 plot_ranks_subgrids(subgrids, time, rank_on_subgrids_adapted, rank_on_subgrids_dropped)

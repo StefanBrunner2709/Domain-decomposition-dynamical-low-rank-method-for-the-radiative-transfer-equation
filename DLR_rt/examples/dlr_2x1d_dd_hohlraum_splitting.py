@@ -27,6 +27,7 @@ method = "lie"
 option_scheme = "upwind"
 option_problem = "hohlraum"
 option_timescheme = "RK4"
+option_rank_adaptivity = "v2"
 
 option_error_estimate = False
 
@@ -47,7 +48,8 @@ lr0_on_subgrids = setInitialCondition_2x1d_lr_subgrids(subgrids, option_cond="la
 rank_on_subgrids_adapted, rank_on_subgrids_dropped) = integrate_dd_hohlraum(
     lr0_on_subgrids, subgrids, t_f, dt, option_scheme=option_scheme, 
     tol_sing_val=tol_sing_val, drop_tol=drop_tol, 
-    option_problem=option_problem, snapshots=snapshots
+    option_problem=option_problem, snapshots=snapshots,
+    option_rank_adaptivity=option_rank_adaptivity
     )
 
 plot_ranks_subgrids(subgrids, time, rank_on_subgrids_adapted, rank_on_subgrids_dropped,
@@ -78,7 +80,8 @@ if option_error_estimate:
                         option_bc=option_problem, tol_sing_val=tol_sing_val*0.001, 
                         drop_tol=drop_tol*0.001, 
                         tol_lattice=tol_lattice*0.001, snapshots=snapshots,
-                        plot_name_add = "high_rank_")
+                        plot_name_add = "high_rank_", 
+                        option_rank_adaptivity=option_rank_adaptivity)
 
     f_2 = lr_2.U @ lr_2.S @ lr_2.V.T
 

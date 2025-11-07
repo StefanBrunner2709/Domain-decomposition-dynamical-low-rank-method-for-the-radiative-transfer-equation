@@ -22,6 +22,7 @@ method = "lie"
 option_grid = "dd"      # Just changes how gridpoints are chosen
 option_scheme = "upwind"
 option_timescheme = "RK4"
+option_rank_adaptivity = "v2"
 
 option_error_estimate = True
 
@@ -144,7 +145,8 @@ lr, time, rank_adapted, rank_dropped = integrate_1domain(lr0, grid,
                                                          t_f, dt, source=source, 
                      option_scheme=option_scheme, option_timescheme=option_timescheme,
                      option_bc=option_bc, tol_sing_val=tol_sing_val, drop_tol=drop_tol, 
-                     tol_lattice=tol_lattice, snapshots=snapshots)
+                     tol_lattice=tol_lattice, snapshots=snapshots, 
+                     option_rank_adaptivity=option_rank_adaptivity)
 
 
 ### Plot for rank over time
@@ -183,7 +185,8 @@ if option_error_estimate:
                         option_bc=option_bc, tol_sing_val=tol_sing_val*0.001, 
                         drop_tol=drop_tol*0.001, 
                         tol_lattice=tol_lattice*0.001, snapshots=snapshots,
-                        plot_name_add = "high_rank_")
+                        plot_name_add = "high_rank_", 
+                        option_rank_adaptivity=option_rank_adaptivity)
 
     f = lr.U @ lr.S @ lr.V.T
 
