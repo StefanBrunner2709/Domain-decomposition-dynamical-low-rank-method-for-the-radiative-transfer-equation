@@ -1657,20 +1657,18 @@ def add_basis_functions_v2(
     if r_t > grid.Nphi:
         r_t = grid.Nphi
 
-    r_b = r_t - grid.r
-    V_b = V_bT.T[:, :r_b]
-    lr.V = np.concatenate((lr.V, V_b), axis=1)
-
-    # lr.V = V_LT.T[:, :r_t]
+    V_new = V_LT.T[:, :r_t]
 
     # Extend S and U accordingly
-    if r_t > grid.r:
-        S_extended = np.zeros((r_t, r_t))
-        S_extended[: grid.r, : grid.r] = lr.S
-        lr.S = S_extended
+    S_extended = np.zeros((r_t, r_t))
+    S_intermediate = lr.S @ lr.V.T @ V_new
+    S_extended[: grid.r, : r_t] = S_intermediate
+    lr.S = S_extended
 
-        X_h = np.random.rand(grid.Nx * grid.Ny, r_t - grid.r)
-        lr.U = np.concatenate((lr.U, X_h), axis=1)
+    X_h = np.random.rand(grid.Nx * grid.Ny, r_t - grid.r)
+    lr.U = np.concatenate((lr.U, X_h), axis=1)
+
+    lr.V = V_new
 
     # Do QR decompositions
     lr.U, R_U = np.linalg.qr(lr.U, mode="reduced")
