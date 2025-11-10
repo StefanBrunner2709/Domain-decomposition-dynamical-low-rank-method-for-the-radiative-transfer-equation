@@ -1569,8 +1569,7 @@ def add_basis_functions(
     """
     # Compute SVD and drop singular values
     X, sing_val, QT = np.linalg.svd(F_b, full_matrices=False)
-    r_b = np.sum(sing_val > tol_sing_val * np.sqrt(grid.Nx*grid.Ny*grid.Nphi/
-                                                   (grid.dx*grid.dy*grid.dphi)))
+    r_b = np.sum(sing_val > tol_sing_val * np.sqrt(grid.Nx*grid.Ny*grid.Nphi))
     if dimensions == "1x1d" and (
         grid.r + r_b
     ) > grid.Nmu:  # because rank cannot be bigger than our amount of gridpoints
@@ -1650,8 +1649,7 @@ def add_basis_functions_v2(
 
     # Truncate according to tol_int
     U_L, sing_val_L, V_LT = np.linalg.svd(L_h.T, full_matrices=False)
-    r_t = np.sum(sing_val_L > tol_int * np.sqrt(grid.Nx*grid.Ny*grid.Nphi/
-                                                   (grid.dx*grid.dy*grid.dphi)))
+    r_t = np.sum(sing_val_L > tol_int * np.sqrt(grid.Nx*grid.Ny*grid.Nphi))
     if r_t < grid.r:
         r_t = grid.r
     if r_t > grid.Nphi:
@@ -1705,8 +1703,7 @@ def drop_basis_functions(lr, grid, drop_tol, min_rank : int = 5):
         Minimum rank for the low rank structure.
     """
     U, sing_val, QT = np.linalg.svd(lr.S, full_matrices=False)
-    r_prime = np.sum(sing_val > drop_tol * np.sqrt(grid.Nx*grid.Ny*grid.Nphi/
-                                                   (grid.dx*grid.dy*grid.dphi)))
+    r_prime = np.sum(sing_val > drop_tol * np.sqrt(grid.Nx*grid.Ny*grid.Nphi))
     if r_prime < min_rank:
         r_prime = min_rank
     lr.S = np.zeros((r_prime, r_prime))
@@ -1736,7 +1733,7 @@ def rank_adaptivity_PSI(lr, grid, tol, min_rank : int = 5):
     min_rank
         Minimum rank for the low rank structure.
     """
-    tol =  tol * np.sqrt(grid.Nx*grid.Ny*grid.Nphi/(grid.dx*grid.dy*grid.dphi))
+    tol =  tol * np.sqrt(grid.Nx*grid.Ny*grid.Nphi)
     tol_drop = 0.1*tol
 
     U, sing_val, QT = np.linalg.svd(lr.S, full_matrices=False)

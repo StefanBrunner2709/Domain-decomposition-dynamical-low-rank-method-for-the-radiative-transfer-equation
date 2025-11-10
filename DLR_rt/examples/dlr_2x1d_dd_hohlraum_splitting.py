@@ -32,9 +32,8 @@ option_rank_adaptivity = "v2"
 
 option_error_estimate = False
 
-tol_sing_val = 1e-7
-drop_tol = 1e-10
-tol_lattice = 2e-11
+tol_sing_val = 3e-4
+drop_tol = 3e-7
 
 
 ### Initial configuration

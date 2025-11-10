@@ -15,9 +15,9 @@ option_bc = "lattice"
 r = 5
 t_f = 0.7
 snapshots = 8
-tol_sing_val = 1e-7
-drop_tol = 1e-10
-tol_lattice = 1e-11
+tol_sing_val = 3e-4
+drop_tol = 3e-7
+tol_lattice = 4e-8
 
 method = "lie"
 option_grid = "dd"      # Just changes how gridpoints are chosen
