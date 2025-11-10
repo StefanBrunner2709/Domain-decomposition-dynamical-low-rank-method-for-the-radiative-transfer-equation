@@ -733,3 +733,29 @@ def setup_coeff_source_1domain(Nx, Ny, option_bc):
         source = np.zeros((Nx,Ny))
 
     return c_adv, c_s, c_t, source, c_s_matrix, c_t_matrix
+
+
+def save_data_to_file(savepath, filename, lr, time, rank_int, rank):
+    """
+    Save data to file.
+
+    Parameters
+    ----------
+    savepath
+        Path to save the data.
+    filename
+        Name of the file.
+    lr
+        Low rank object to be saved.
+    time
+        Time vector.
+    rank_int
+        Intermediate rank vector.
+    rank
+        Rank vector.
+    """
+
+    np.savez(savepath + filename + "_t" + str(time[-1]) + ".npz", 
+             U=lr.U, S=lr.S, V=lr.V, time=time, rank_int=rank_int, rank=rank)
+
+    return

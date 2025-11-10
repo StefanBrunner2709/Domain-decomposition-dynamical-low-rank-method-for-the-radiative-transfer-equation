@@ -5,6 +5,7 @@ import numpy as np
 
 from DLR_rt.src.grid import Grid_2x1d
 from DLR_rt.src.initial_condition import setInitialCondition_2x1d_lr
+from DLR_rt.src.lr import LR
 from DLR_rt.src.run_functions import integrate_1domain
 from DLR_rt.src.util import setup_coeff_source_1domain
 
@@ -148,6 +149,9 @@ lr, time, rank_adapted, rank_dropped = integrate_1domain(lr0, grid,
                      tol_lattice=tol_lattice, snapshots=snapshots, 
                      option_rank_adaptivity=option_rank_adaptivity)
 
+# save_data_to_file("data/", "reference_sol_" + option_bc, 
+#                   lr, time, rank_adapted, rank_dropped)
+
 
 ### Plot for rank over time
 
@@ -177,16 +181,23 @@ if option_error_estimate:
     lr0_2 = setInitialCondition_2x1d_lr(grid_2, option_cond="lattice")
     f0_2 = lr0_2.U @ lr0_2.S @ lr0_2.V.T
 
-    ### Run code and do the plotting
-    lr_2, time_2, rank_adapted_2, rank_dropped_2 = integrate_1domain(
-                        lr0_2, grid_2, t_f, dt, source=source, 
-                        option_scheme=option_scheme, 
-                        option_timescheme=option_timescheme,
-                        option_bc=option_bc, tol_sing_val=tol_sing_val*0.001, 
-                        drop_tol=drop_tol*0.001, 
-                        tol_lattice=tol_lattice*0.001, snapshots=snapshots,
-                        plot_name_add = "high_rank_", 
-                        option_rank_adaptivity=option_rank_adaptivity)
+    # ### Run code and do the plotting
+    # lr_2, time_2, rank_adapted_2, rank_dropped_2 = integrate_1domain(
+    #                     lr0_2, grid_2, t_f, dt, source=source, 
+    #                     option_scheme=option_scheme, 
+    #                     option_timescheme=option_timescheme,
+    #                     option_bc=option_bc, tol_sing_val=tol_sing_val*0.001, 
+    #                     drop_tol=drop_tol*0.001, 
+    #                     tol_lattice=tol_lattice*0.001, snapshots=snapshots,
+    #                     plot_name_add = "high_rank_", 
+    #                     option_rank_adaptivity=option_rank_adaptivity)
+    
+    ### Copy data from already existing file
+    data = np.load("data/reference_sol_" + option_bc + "_t" + str(time[-1]) + ".npz")
+    lr_2 = LR(data["U"], data["S"], data["V"])
+    time_2 = data["time"]
+    rank_adapted_2 = data["rank_int"]
+    rank_dropped_2 = data["rank"]
 
     f = lr.U @ lr.S @ lr.V.T
 
