@@ -30,10 +30,10 @@ option_problem = "hohlraum"
 option_timescheme = "RK4"
 option_rank_adaptivity = "v2"
 
-option_error_estimate = False
+option_error_estimate = True
 
-tol_sing_val = 3e-4
-drop_tol = 3e-7
+tol_sing_val = 1e-7
+drop_tol = 1e-10
 
 
 ### Initial configuration
@@ -96,5 +96,6 @@ if option_error_estimate:
     f = generate_full_f(lr_on_subgrids, subgrids, grid)
 
     Frob = np.linalg.norm(f - f_2, ord='fro')
+    Frob /= np.sqrt(Nx * Ny * Nphi)
 
     print("Frobenius: ", Frob)

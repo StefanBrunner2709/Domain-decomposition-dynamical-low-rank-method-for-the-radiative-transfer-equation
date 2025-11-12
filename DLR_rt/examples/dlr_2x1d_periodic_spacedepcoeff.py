@@ -11,13 +11,13 @@ from DLR_rt.src.util import setup_coeff_source_1domain
 
 ### Plotting
 
-option_bc = "lattice"
+option_bc = "hohlraum"
 r = 5
-t_f = 0.7
-snapshots = 8
-tol_sing_val = 3e-4
-drop_tol = 3e-7
-tol_lattice = 4e-8
+t_f = 1.2
+snapshots = 7
+tol_sing_val = 1e-10
+drop_tol = 1e-13
+tol_lattice = 1e-14
 
 method = "lie"
 option_grid = "dd"      # Just changes how gridpoints are chosen
@@ -25,7 +25,7 @@ option_scheme = "upwind"
 option_timescheme = "RK4"
 option_rank_adaptivity = "v2"
 
-option_error_estimate = True
+option_error_estimate = False
 
 fs = 26
 savepath = "plots/"
@@ -204,6 +204,7 @@ if option_error_estimate:
     f_2 = lr_2.U @ lr_2.S @ lr_2.V.T
 
     Frob = np.linalg.norm(f - f_2, ord='fro')
+    Frob /= np.sqrt(Nx * Ny * Nphi)
 
     print("Frobenius: ", Frob)
 

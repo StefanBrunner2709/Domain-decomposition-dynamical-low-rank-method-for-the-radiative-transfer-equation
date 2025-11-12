@@ -1569,7 +1569,9 @@ def add_basis_functions(
     """
     # Compute SVD and drop singular values
     X, sing_val, QT = np.linalg.svd(F_b, full_matrices=False)
-    r_b = np.sum(sing_val > tol_sing_val * np.sqrt(grid.Nx*grid.Ny*grid.Nphi))
+    r_b = np.sum(sing_val > tol_sing_val * np.sqrt(grid.Nx*grid.Ny*grid.Nphi/
+                                                (grid.dx*grid.dy*grid.dphi)))
+    
     if dimensions == "1x1d" and (
         grid.r + r_b
     ) > grid.Nmu:  # because rank cannot be bigger than our amount of gridpoints
@@ -1642,14 +1644,21 @@ def add_basis_functions_v2(
     V_b = V_bT.T
     Sigma_b = np.diag(sing_val)
 
-    #Form L_h
+    # Form L_h
     L = lr.V @ lr.S.T
     L_b = V_b @ Sigma_b.T
     L_h = np.concatenate((L, L_b), axis=1)
 
     # Truncate according to tol_int
     U_L, sing_val_L, V_LT = np.linalg.svd(L_h.T, full_matrices=False)
-    r_t = np.sum(sing_val_L > tol_int * np.sqrt(grid.Nx*grid.Ny*grid.Nphi))
+
+    r_t = len(sing_val_L)
+    sum_drop = (sing_val_L[-1]**2)
+    while sum_drop < (tol_int * np.sqrt(grid.Nx*grid.Ny*grid.Nphi/
+                                       (grid.dx*grid.dy*grid.dphi)))**2 and r_t > 0:
+        r_t -= 1
+        sum_drop += (sing_val_L[r_t-1]**2)
+
     if r_t < grid.r:
         r_t = grid.r
     if r_t > grid.Nphi:
@@ -1703,7 +1712,14 @@ def drop_basis_functions(lr, grid, drop_tol, min_rank : int = 5):
         Minimum rank for the low rank structure.
     """
     U, sing_val, QT = np.linalg.svd(lr.S, full_matrices=False)
-    r_prime = np.sum(sing_val > drop_tol * np.sqrt(grid.Nx*grid.Ny*grid.Nphi))
+
+    r_prime = len(sing_val)
+    sum_drop = (sing_val[-1]**2)
+    while sum_drop < (drop_tol * np.sqrt(grid.Nx*grid.Ny*grid.Nphi/
+                                       (grid.dx*grid.dy*grid.dphi)))**2 and r_prime > 0:
+        r_prime -= 1
+        sum_drop += (sing_val[r_prime-1]**2)
+    
     if r_prime < min_rank:
         r_prime = min_rank
     lr.S = np.zeros((r_prime, r_prime))
@@ -1733,7 +1749,8 @@ def rank_adaptivity_PSI(lr, grid, tol, min_rank : int = 5):
     min_rank
         Minimum rank for the low rank structure.
     """
-    tol =  tol * np.sqrt(grid.Nx*grid.Ny*grid.Nphi)
+    tol =  tol * np.sqrt(grid.Nx*grid.Ny*grid.Nphi/
+                        (grid.dx*grid.dy*grid.dphi))
     tol_drop = 0.1*tol
 
     U, sing_val, QT = np.linalg.svd(lr.S, full_matrices=False)

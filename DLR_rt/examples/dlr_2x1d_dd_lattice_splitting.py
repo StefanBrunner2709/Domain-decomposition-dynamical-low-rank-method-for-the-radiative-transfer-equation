@@ -31,9 +31,9 @@ option_rank_adaptivity = "v2"
 
 option_error_estimate = True
 
-tol_sing_val = 4e-5
-drop_tol = 8e-9
-tol_lattice = 8e-8
+tol_sing_val = 1e-8
+drop_tol = 2e-12
+tol_lattice = 1e-11
 
 
 ### Initial configuration
@@ -93,5 +93,6 @@ if option_error_estimate:
     f = generate_full_f(lr_on_subgrids, subgrids, grid)
 
     Frob = np.linalg.norm(f - f_2, ord='fro')
+    Frob /= np.sqrt(Nx * Ny * Nphi)
 
     print("Frobenius: ", Frob)

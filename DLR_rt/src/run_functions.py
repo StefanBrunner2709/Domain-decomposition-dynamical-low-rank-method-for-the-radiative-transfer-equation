@@ -13,6 +13,7 @@ from DLR_rt.src.util import (
     computeD_upwind_2x1d,
     plot_rho_onedomain,
     plot_rho_subgrids,
+    save_data_to_file,
 )
 
 
@@ -537,14 +538,17 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
         DY_1 = None
 
     # --- SNAPSHOT setup ---
-    if snapshots < 2:
-        snapshots = 2  # At least initial and final
-    snapshot_times = [i * t_f / (snapshots - 1) for i in range(snapshots)]
-    next_snapshot_idx = 1  # first snapshot after t=0
+    if snapshots >= 2:
+        snapshot_times = [i * t_f / (snapshots - 1) for i in range(snapshots)]
+        next_snapshot_idx = 1  # first snapshot after t=0
 
-    # --- Initial snapshot ---
-    print(f"📸 Snapshot 1/{snapshots} at t = {t:.4f}")
-    plot_rho_onedomain(grid, lr, t=t, plot_name_add=plot_name_add)
+        # --- Initial snapshot ---
+        print(f"📸 Snapshot 1/{snapshots} at t = {t:.4f}")
+        plot_rho_onedomain(grid, lr, t=t, plot_name_add=plot_name_add)
+        save_data_to_file(savepath = "data/", 
+                            filename = "reference_sol_" + option_bc, 
+                            lr=lr, time=time,
+                            rank_int = rank_adapted, rank = rank_dropped)
 
     with tqdm(total=t_f / dt, desc="Running Simulation") as pbar:
         while t < t_f:
@@ -583,9 +587,14 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
             time.append(t)
 
             # --- Check for snapshot condition ---
-            if next_snapshot_idx < snapshots and t >= snapshot_times[next_snapshot_idx]:
+            if (snapshots >= 2 and next_snapshot_idx < snapshots and 
+                t >= snapshot_times[next_snapshot_idx]):
                 print(f"📸 Snapshot {next_snapshot_idx+1}/{snapshots} at t = {t:.4f}")
                 plot_rho_onedomain(grid, lr, t=t, plot_name_add=plot_name_add)
                 next_snapshot_idx += 1
+                save_data_to_file(savepath = "data/", 
+                                  filename = "reference_sol_" + option_bc, 
+                                  lr=lr, time=time,
+                                  rank_int = rank_adapted, rank = rank_dropped)
 
     return lr, time, rank_adapted, rank_dropped
