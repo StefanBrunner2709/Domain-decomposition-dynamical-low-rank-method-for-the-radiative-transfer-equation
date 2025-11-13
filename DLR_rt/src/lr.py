@@ -1569,7 +1569,7 @@ def add_basis_functions(
     """
     # ToDo: Check if scaling here is correct 
     # (not checked yet because I mainly use v2 now)
-    
+
     # Compute SVD and drop singular values
     X, sing_val, QT = np.linalg.svd(F_b, full_matrices=False)
 
@@ -1650,9 +1650,7 @@ def add_basis_functions_v2(
     # Perform SVD
     U_b, sing_val, V_bT = np.linalg.svd(F_b, full_matrices=False)
 
-    U_b /= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
-    V_bT /= np.sqrt(grid.dphi)
-    sing_val *= np.sqrt(grid.dphi) * (np.sqrt(grid.dx) * np.sqrt(grid.dy))
+   # No scaling necessary because we do SVD again afterwards
 
     V_b = V_bT.T
     Sigma_b = np.diag(sing_val)
@@ -1662,15 +1660,11 @@ def add_basis_functions_v2(
     L_b = V_b @ Sigma_b.T
     L_h = np.concatenate((L, L_b), axis=1)
 
-    # Scale back dx, dy
-    L_h /= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
-
     # Truncate according to tol_int
-    U_L, sing_val_L, V_LT = np.linalg.svd(L_h.T, full_matrices=False)
+    V_L, sing_val_L, U_LT = np.linalg.svd(L_h, full_matrices=False)
     
-    U_L /= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
-    V_LT /= np.sqrt(grid.dphi)
-    sing_val_L *= np.sqrt(grid.dphi) * (np.sqrt(grid.dx) * np.sqrt(grid.dy))
+    V_L /= np.sqrt(grid.dphi)
+    sing_val_L *= np.sqrt(grid.dphi)
 
     r_t = len(sing_val_L)
     sum_drop = (sing_val_L[-1]**2)
@@ -1684,8 +1678,10 @@ def add_basis_functions_v2(
     if r_t > grid.Nphi:
         r_t = grid.Nphi
 
-    V_new = V_LT.T[:, :r_t]
-    V_new *= np.sqrt(grid.dphi)    # I rescaled it back because of f
+    V_new = V_L[:, :r_t]
+
+    V_new *= np.sqrt(grid.dphi) # Rescale back
+    # Need to do that, because we are not using the singular values afterwards
 
     # Extend S and U accordingly
     S_extended = np.zeros((r_t, r_t))
