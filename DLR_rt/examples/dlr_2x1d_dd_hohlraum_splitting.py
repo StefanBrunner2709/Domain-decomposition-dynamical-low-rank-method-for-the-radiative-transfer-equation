@@ -84,8 +84,7 @@ if option_error_estimate:
     #                     option_rank_adaptivity=option_rank_adaptivity)
     
     ### Copy data from already existing file
-    data = np.load("data/reference_sol_" + 
-                   option_problem + "_t" + str(time[-1]) + ".npz")
+    data = np.load(f"data/reference_sol_{option_problem}_t{time[-1]:.4f}.npz")
     lr_2 = LR(data["U"], data["S"], data["V"])
     time_2 = data["time"]
     rank_adapted_2 = data["rank_int"]

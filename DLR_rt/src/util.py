@@ -755,7 +755,7 @@ def save_data_to_file(savepath, filename, lr, time, rank_int, rank):
         Rank vector.
     """
 
-    np.savez(savepath + filename + "_t" + str(time[-1]) + ".npz", 
+    np.savez(f"{savepath}{filename}_t{time[-1]:.4f}.npz", 
              U=lr.U, S=lr.S, V=lr.V, time=time, rank_int=rank_int, rank=rank)
 
     return

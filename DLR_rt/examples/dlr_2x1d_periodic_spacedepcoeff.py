@@ -14,9 +14,9 @@ from DLR_rt.src.util import setup_coeff_source_1domain
 option_bc = "hohlraum"
 r = 5
 t_f = 1.2
-snapshots = 7
+snapshots = 121
 tol_sing_val = 1e-10
-drop_tol = 1e-13
+drop_tol = 1e-10
 tol_lattice = 1e-14
 
 method = "lie"
@@ -193,7 +193,7 @@ if option_error_estimate:
     #                     option_rank_adaptivity=option_rank_adaptivity)
     
     ### Copy data from already existing file
-    data = np.load("data/reference_sol_" + option_bc + "_t" + str(time[-1]) + ".npz")
+    data = np.load(f"data/reference_sol_{option_bc}_t{time[-1]:.4f}.npz")
     lr_2 = LR(data["U"], data["S"], data["V"])
     time_2 = data["time"]
     rank_adapted_2 = data["rank_int"]
