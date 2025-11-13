@@ -58,7 +58,13 @@ def setInitialCondition_1x1d_lr(grid: Grid_1x1d, sigma: float = 1.0):
         S[0, 0] = 1.0
 
     U_ortho, R_U = np.linalg.qr(U, mode="reduced")
+    U_ortho /= (np.sqrt(grid.dx))
+    R_U *= (np.sqrt(grid.dx))
+
     V_ortho, R_V = np.linalg.qr(V, mode="reduced")
+    V_ortho /= np.sqrt(grid.dmu)
+    R_V *= np.sqrt(grid.dmu)
+
     S_ortho = R_U @ S @ R_V.T
 
     lr = LR(U_ortho, S_ortho, V_ortho)
@@ -115,6 +121,11 @@ def setInitialCondition_2x1d_lr(grid: Grid_2x1d, option_cond: str = "standard"):
             )
 
         U, S, Vt = np.linalg.svd(f, full_matrices=False)
+
+        U /= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
+        Vt /= np.sqrt(grid.dphi)
+        S *= np.sqrt(grid.dx * grid.dy * grid.dphi)
+
         V = Vt.T
 
         U = U[:,:grid.r]
@@ -122,7 +133,13 @@ def setInitialCondition_2x1d_lr(grid: Grid_2x1d, option_cond: str = "standard"):
         S = np.diag(S[:grid.r])
 
     U_ortho, R_U = np.linalg.qr(U, mode="reduced")
+    U_ortho /= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
+    R_U *= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
+
     V_ortho, R_V = np.linalg.qr(V, mode="reduced")
+    V_ortho /= np.sqrt(grid.dphi)
+    R_V *= np.sqrt(grid.dphi)
+
     S_ortho = R_U @ S @ R_V.T
 
     lr = LR(U_ortho, S_ortho, V_ortho)
@@ -176,7 +193,13 @@ def setInitialCondition_2x1d_lr_subgrids(subgrids, option_cond: str = "standard"
                 S[0,0] = 1.0
 
             U_ortho, R_U = np.linalg.qr(U, mode="reduced")
+            U_ortho /= (np.sqrt(subgrids[j][i].dx) * np.sqrt(subgrids[j][i].dy))
+            R_U *= (np.sqrt(subgrids[j][i].dx) * np.sqrt(subgrids[j][i].dy))
+
             V_ortho, R_V = np.linalg.qr(V, mode="reduced")
+            V_ortho /= np.sqrt(subgrids[j][i].dphi)
+            R_V *= np.sqrt(subgrids[j][i].dphi)
+
             S_ortho = R_U @ S @ R_V.T
 
             lr = LR(U_ortho, S_ortho, V_ortho)

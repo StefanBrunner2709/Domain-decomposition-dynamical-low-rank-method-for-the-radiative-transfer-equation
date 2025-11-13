@@ -1567,9 +1567,17 @@ def add_basis_functions(
     dimensions
         Can be chosen "1x1d" or "2x1d".
     """
+    # ToDo: Check if scaling here is correct 
+    # (not checked yet because I mainly use v2 now)
+    
     # Compute SVD and drop singular values
     X, sing_val, QT = np.linalg.svd(F_b, full_matrices=False)
-    r_b = np.sum(sing_val > tol_sing_val * np.sqrt(grid.Nx*grid.Ny*grid.Nphi/
+
+    X /= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
+    sing_val *= np.sqrt(grid.dx * grid.dy * grid.dphi)
+    QT /= np.sqrt(grid.dphi)
+
+    r_b = np.sum(sing_val > tol_sing_val * np.sqrt(grid.Nx*grid.Ny*grid.Nphi*
                                                 (grid.dx*grid.dy*grid.dphi)))
     
     if dimensions == "1x1d" and (
@@ -1641,6 +1649,11 @@ def add_basis_functions_v2(
 
     # Perform SVD
     U_b, sing_val, V_bT = np.linalg.svd(F_b, full_matrices=False)
+
+    U_b /= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
+    V_bT /= np.sqrt(grid.dphi)
+    sing_val *= np.sqrt(grid.dphi) * (np.sqrt(grid.dx) * np.sqrt(grid.dy))
+
     V_b = V_bT.T
     Sigma_b = np.diag(sing_val)
 
@@ -1649,12 +1662,19 @@ def add_basis_functions_v2(
     L_b = V_b @ Sigma_b.T
     L_h = np.concatenate((L, L_b), axis=1)
 
+    # Scale back dx, dy
+    L_h /= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
+
     # Truncate according to tol_int
     U_L, sing_val_L, V_LT = np.linalg.svd(L_h.T, full_matrices=False)
+    
+    U_L /= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
+    V_LT /= np.sqrt(grid.dphi)
+    sing_val_L *= np.sqrt(grid.dphi) * (np.sqrt(grid.dx) * np.sqrt(grid.dy))
 
     r_t = len(sing_val_L)
     sum_drop = (sing_val_L[-1]**2)
-    while sum_drop < (tol_int * np.sqrt(grid.Nx*grid.Ny*grid.Nphi/
+    while sum_drop < (tol_int * np.sqrt(grid.Nx*grid.Ny*grid.Nphi*
                                        (grid.dx*grid.dy*grid.dphi)))**2 and r_t > 0:
         r_t -= 1
         sum_drop += (sing_val_L[r_t-1]**2)
@@ -1665,6 +1685,7 @@ def add_basis_functions_v2(
         r_t = grid.Nphi
 
     V_new = V_LT.T[:, :r_t]
+    V_new *= np.sqrt(grid.dphi)    # I rescaled it back because of f
 
     # Extend S and U accordingly
     S_extended = np.zeros((r_t, r_t))
@@ -1713,9 +1734,11 @@ def drop_basis_functions(lr, grid, drop_tol, min_rank : int = 5):
     """
     U, sing_val, QT = np.linalg.svd(lr.S, full_matrices=False)
 
+    # I do not need to rescale after this SVD
+
     r_prime = len(sing_val)
     sum_drop = (sing_val[-1]**2)
-    while sum_drop < (drop_tol * np.sqrt(grid.Nx*grid.Ny*grid.Nphi/
+    while sum_drop < (drop_tol * np.sqrt(grid.Nx*grid.Ny*grid.Nphi*
                                        (grid.dx*grid.dy*grid.dphi)))**2 and r_prime > 0:
         r_prime -= 1
         sum_drop += (sing_val[r_prime-1]**2)
@@ -1749,11 +1772,14 @@ def rank_adaptivity_PSI(lr, grid, tol, min_rank : int = 5):
     min_rank
         Minimum rank for the low rank structure.
     """
-    tol =  tol * np.sqrt(grid.Nx*grid.Ny*grid.Nphi/
+    tol =  tol * np.sqrt(grid.Nx*grid.Ny*grid.Nphi*
                         (grid.dx*grid.dy*grid.dphi))
     tol_drop = 0.1*tol
 
     U, sing_val, QT = np.linalg.svd(lr.S, full_matrices=False)
+
+    # I do not need to rescale after this SVD
+
     r_prime_drop = np.sum(sing_val > tol_drop)
     r_prime_add = np.sum(sing_val > tol)
 
