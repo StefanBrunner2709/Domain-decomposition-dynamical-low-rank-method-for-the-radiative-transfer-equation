@@ -155,11 +155,15 @@ lr, time, rank_adapted, rank_dropped = integrate_1domain(lr0, grid,
 
 ### Plot for rank over time
 
+y_min = min(np.min(rank_adapted), np.min(rank_dropped)) - 1
+y_max = max(np.max(rank_adapted), np.max(rank_dropped)) + 1
+
 fig, axes = plt.subplots(1, 1, figsize=(10, 8))
 plt.plot(time, rank_adapted)
 axes.set_xlabel("$t$", fontsize=fs)
 axes.set_ylabel("$r(t)$", fontsize=fs)
 axes.set_xlim(time[0], time[-1]) # Remove extra padding: set x-limits to data range  
+axes.set_ylim(y_min, y_max)
 axes.tick_params(axis='both', which='major', labelsize=fs)
 plt.savefig(savepath + "1domainsim_rank_adapted.pdf")
 
@@ -168,6 +172,7 @@ plt.plot(time, rank_dropped)
 axes.set_xlabel("$t$", fontsize=fs)
 axes.set_ylabel("$r(t)$", fontsize=fs)
 axes.set_xlim(time[0], time[-1]) # Remove extra padding: set x-limits to data range
+axes.set_ylim(y_min, y_max)
 axes.tick_params(axis='both', which='major', labelsize=fs)  
 plt.savefig(savepath + "1domainsim_rank_dropped.pdf")
 

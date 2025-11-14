@@ -355,6 +355,16 @@ def plot_ranks_subgrids(subgrids, time,
 
     n_split_x = subgrids[0][0].n_split_x
     n_split_y = subgrids[0][0].n_split_y
+
+    all_values = []
+
+    for j in range(n_split_y):
+        for i in range(n_split_x):
+            all_values.append(rank_on_subgrids_adapted[j][i])
+            all_values.append(rank_on_subgrids_dropped[j][i])
+
+    y_min = min(np.min(v) for v in all_values) - 1
+    y_max = max(np.max(v) for v in all_values) + 1
     
     fig, axes = plt.subplots(1, 1, figsize=(10, 8))
     for j in range(n_split_y):
@@ -365,6 +375,7 @@ def plot_ranks_subgrids(subgrids, time,
     axes.set_xlabel("$t$", fontsize=fs)
     axes.set_ylabel("$r(t)$", fontsize=fs)
     axes.set_xlim(time[0], time[-1]) # Remove extra padding: set x-limits to data range
+    axes.set_ylim(y_min, y_max) 
     axes.tick_params(axis='both', which='major', labelsize=fs)
     plt.savefig(savepath + plot_name_add 
                 + "dd_splitting_2x1d_subgrids_rank_adapted.pdf")
@@ -378,6 +389,7 @@ def plot_ranks_subgrids(subgrids, time,
     axes.set_xlabel("$t$", fontsize=fs)
     axes.set_ylabel("$r(t)$", fontsize=fs)
     axes.set_xlim(time[0], time[-1]) # Remove extra padding: set x-limits to data range
+    axes.set_ylim(y_min, y_max) 
     axes.tick_params(axis='both', which='major', labelsize=fs)
     plt.savefig(savepath + plot_name_add 
                 + "dd_splitting_2x1d_subgrids_rank_dropped.pdf")
