@@ -566,7 +566,8 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
               option_scheme : str = "cendiff", option_timescheme : str = "RK4",
               option_bc : str = "standard", tol_sing_val = 1e-2, drop_tol = 1e-3, 
               tol_lattice = 1e-5, snapshots: int = 2, plot_name_add = "",
-              option_rank_adaptivity: str = "v1"):
+              option_rank_adaptivity: str = "v1",
+              option_data_saves: int = 0):
     """
     Integrate low rank structure on 1 domain.
 
@@ -605,6 +606,8 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
         Additional string to add to plot names.
     option_rank_adaptivity
         Possible options are "v1" or "v2".
+    option_data_saves
+        If > 0, number of data saves during simulation.
     """
     min_rank = grid.r
 
@@ -638,6 +641,13 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
         # --- Initial snapshot ---
         print(f"📸 Snapshot 1/{snapshots} at t = {t:.4f}")
         plot_rho_onedomain(grid, lr, t=t, plot_name_add=plot_name_add)
+        
+    # --- Sava data ---
+    if option_data_saves > 0:
+        data_saves_times = [i * t_f /
+                             (option_data_saves - 1) for i in range(option_data_saves)]
+        next_data_saves_idx = 1
+
         save_data_to_file(savepath = "data/", 
                             filename = "reference_sol_" + option_bc, 
                             lr=lr, time=time,
@@ -685,9 +695,16 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
                 print(f"📸 Snapshot {next_snapshot_idx+1}/{snapshots} at t = {t:.4f}")
                 plot_rho_onedomain(grid, lr, t=t, plot_name_add=plot_name_add)
                 next_snapshot_idx += 1
+                
+            # --- Save data ---
+            if (option_data_saves > 0 and next_data_saves_idx < option_data_saves 
+                and t >= data_saves_times[next_data_saves_idx]):
+                
                 save_data_to_file(savepath = "data/", 
                                   filename = "reference_sol_" + option_bc, 
                                   lr=lr, time=time,
                                   rank_int = rank_adapted, rank = rank_dropped)
+                
+                next_data_saves_idx += 1
 
     return lr, time, rank_adapted, rank_dropped

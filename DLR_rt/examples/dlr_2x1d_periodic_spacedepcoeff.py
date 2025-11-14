@@ -11,13 +11,13 @@ from DLR_rt.src.util import setup_coeff_source_1domain
 
 ### Plotting
 
-option_bc = "hohlraum"
+option_bc = "lattice"
 r = 5
-t_f = 1.2
-snapshots = 121
+t_f = 0.7
+snapshots = 7
 tol_sing_val = 1e-10
 drop_tol = 1e-10
-tol_lattice = 1e-14
+tol_lattice = 1e-5
 
 method = "lie"
 option_grid = "dd"      # Just changes how gridpoints are chosen
@@ -25,6 +25,7 @@ option_scheme = "upwind"
 option_timescheme = "RK4"
 option_rank_adaptivity = "v2"
 
+option_data_saves = 0
 option_error_estimate = False
 
 fs = 26
@@ -147,10 +148,8 @@ lr, time, rank_adapted, rank_dropped = integrate_1domain(lr0, grid,
                      option_scheme=option_scheme, option_timescheme=option_timescheme,
                      option_bc=option_bc, tol_sing_val=tol_sing_val, drop_tol=drop_tol, 
                      tol_lattice=tol_lattice, snapshots=snapshots, 
-                     option_rank_adaptivity=option_rank_adaptivity)
-
-# save_data_to_file("data/", "reference_sol_" + option_bc, 
-#                   lr, time, rank_adapted, rank_dropped)
+                     option_rank_adaptivity=option_rank_adaptivity,
+                     option_data_saves=option_data_saves)
 
 
 ### Plot for rank over time
