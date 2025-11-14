@@ -316,7 +316,8 @@ def integrate_dd_lattice(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                          option_scheme: str = "cendiff", 
                          option_timescheme : str = "RK4", 
                          snapshots: int = 2, plot_name_add = "",
-                         option_rank_adaptivity: str = "v1"):
+                         option_rank_adaptivity: str = "v1",
+                         grid: Grid_2x1d = None, option_error_list: int = 0):
     """
     Integrate low rank structure for lattice setup with domain decomposition.
 
@@ -347,6 +348,10 @@ def integrate_dd_lattice(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
         Additional string to add to plot names.
     option_rank_adaptivity
         Possible options are "v1" or "v2".
+    grid
+        Full grid class for error computation.
+    option_error_list
+        If > 0, compute error to reference solution.
     """
     
     lr_on_subgrids = lr0_on_subgrids
@@ -394,6 +399,27 @@ def integrate_dd_lattice(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
     print(f"📸 Snapshot 1/{snapshots} at t = {t:.4f}")
     plot_rho_subgrids(subgrids, lr_on_subgrids, t=t, plot_option="log", 
                       plot_name_add=plot_name_add)
+    
+    # --- Compare to reference solution ---
+    Frob_list = []
+
+    if option_error_list > 0:
+        error_list_times = [i * t_f /
+                             (option_error_list - 1) for i in range(option_error_list)]
+        next_error_list_idx = 1
+
+        # Copy data from already existing file
+        data = np.load(f"data/reference_sol_lattice_t{t:.4f}.npz")
+        lr_2 = LR(data["U"], data["S"], data["V"])
+
+        f_2 = lr_2.U @ lr_2.S @ lr_2.V.T
+
+        f = generate_full_f(lr_on_subgrids, subgrids, grid)
+
+        Frob = np.linalg.norm(f - f_2, ord='fro')
+        Frob /= np.sqrt(grid.Nx * grid.Ny * grid.Nphi)
+
+        Frob_list.append(Frob)
         
     with tqdm(total=t_f / dt, desc="Running Simulation") as pbar:
         while t < t_f:
@@ -513,7 +539,27 @@ def integrate_dd_lattice(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                                   plot_name_add=plot_name_add)
                 next_snapshot_idx += 1
 
-    return lr_on_subgrids, time, rank_on_subgrids_adapted, rank_on_subgrids_dropped
+            # --- Check for error computation condition ---
+            if (option_error_list > 0 and next_error_list_idx < option_error_list 
+                and t >= error_list_times[next_error_list_idx]):
+                
+                # Copy data from already existing file
+                data = np.load(f"data/reference_sol_lattice_t{t:.4f}.npz")
+                lr_2 = LR(data["U"], data["S"], data["V"])
+
+                f_2 = lr_2.U @ lr_2.S @ lr_2.V.T
+
+                f = generate_full_f(lr_on_subgrids, subgrids, grid)
+
+                Frob = np.linalg.norm(f - f_2, ord='fro')
+                Frob /= np.sqrt(grid.Nx * grid.Ny * grid.Nphi)
+
+                Frob_list.append(Frob)
+
+                next_error_list_idx += 1
+
+    return (lr_on_subgrids, time, 
+            rank_on_subgrids_adapted, rank_on_subgrids_dropped, Frob_list)
 
 def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float, 
               option: str = "lie", source = None, 
