@@ -567,7 +567,8 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
               option_bc : str = "standard", tol_sing_val = 1e-2, drop_tol = 1e-3, 
               tol_lattice = 1e-5, snapshots: int = 2, plot_name_add = "",
               option_rank_adaptivity: str = "v1",
-              option_data_saves: int = 0):
+              option_data_saves: int = 0,
+              option_error_list: int = 0):
     """
     Integrate low rank structure on 1 domain.
 
@@ -608,6 +609,8 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
         Possible options are "v1" or "v2".
     option_data_saves
         If > 0, number of data saves during simulation.
+    option_error_list
+        If > 0, compute error to reference solution.
     """
     min_rank = grid.r
 
@@ -652,6 +655,27 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
                             filename = "reference_sol_" + option_bc, 
                             lr=lr, time=time,
                             rank_int = rank_adapted, rank = rank_dropped)
+        
+    # --- Compare to reference solution ---
+    Frob_list = []
+
+    if option_error_list > 0:
+        error_list_times = [i * t_f /
+                             (option_error_list - 1) for i in range(option_error_list)]
+        next_error_list_idx = 1
+
+        # Copy data from already existing file
+        data = np.load(f"data/reference_sol_{option_bc}_t{t:.4f}.npz")
+        lr_2 = LR(data["U"], data["S"], data["V"])
+
+        f_2 = lr_2.U @ lr_2.S @ lr_2.V.T
+
+        f = lr.U @ lr.S @ lr.V.T
+
+        Frob = np.linalg.norm(f - f_2, ord='fro')
+        Frob /= np.sqrt(grid.Nx * grid.Ny * grid.Nphi)
+
+        Frob_list.append(Frob)
 
     with tqdm(total=t_f / dt, desc="Running Simulation") as pbar:
         while t < t_f:
@@ -707,4 +731,23 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
                 
                 next_data_saves_idx += 1
 
-    return lr, time, rank_adapted, rank_dropped
+            # --- Check for error computation condition ---
+            if (option_error_list > 0 and next_error_list_idx < option_error_list 
+                and t >= error_list_times[next_error_list_idx]):
+                
+                # Copy data from already existing file
+                data = np.load(f"data/reference_sol_{option_bc}_t{t:.4f}.npz")
+                lr_2 = LR(data["U"], data["S"], data["V"])
+
+                f_2 = lr_2.U @ lr_2.S @ lr_2.V.T
+
+                f = lr.U @ lr.S @ lr.V.T
+
+                Frob = np.linalg.norm(f - f_2, ord='fro')
+                Frob /= np.sqrt(grid.Nx * grid.Ny * grid.Nphi)
+
+                Frob_list.append(Frob)
+
+                next_error_list_idx += 1
+
+    return lr, time, rank_adapted, rank_dropped, Frob_list

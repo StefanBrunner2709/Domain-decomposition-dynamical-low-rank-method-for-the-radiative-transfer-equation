@@ -11,13 +11,13 @@ from DLR_rt.src.util import setup_coeff_source_1domain
 
 ### Plotting
 
-option_bc = "lattice"
+option_bc = "hohlraum"
 r = 5
-t_f = 0.7
+t_f = 1.2
 snapshots = 7
-tol_sing_val = 1e-10
-drop_tol = 1e-10
-tol_lattice = 1e-5
+tol_sing_val = 1e-4
+drop_tol = 1e-4
+tol_lattice = 3e-5
 
 method = "lie"
 option_grid = "dd"      # Just changes how gridpoints are chosen
@@ -26,7 +26,8 @@ option_timescheme = "RK4"
 option_rank_adaptivity = "v2"
 
 option_data_saves = 0
-option_error_estimate = False
+option_error_estimate = True
+option_error_list = 121 # hohlraum: 121, lattice: 71, pointsource: 101
 
 fs = 26
 savepath = "plots/"
@@ -143,13 +144,14 @@ source = source.flatten()[:, None]
 
 
 ### Run code and do the plotting
-lr, time, rank_adapted, rank_dropped = integrate_1domain(lr0, grid, 
+lr, time, rank_adapted, rank_dropped, Frob_list = integrate_1domain(lr0, grid, 
                                                          t_f, dt, source=source, 
                      option_scheme=option_scheme, option_timescheme=option_timescheme,
                      option_bc=option_bc, tol_sing_val=tol_sing_val, drop_tol=drop_tol, 
                      tol_lattice=tol_lattice, snapshots=snapshots, 
                      option_rank_adaptivity=option_rank_adaptivity,
-                     option_data_saves=option_data_saves)
+                     option_data_saves=option_data_saves, 
+                     option_error_list=option_error_list)
 
 
 ### Plot for rank over time
@@ -178,23 +180,6 @@ plt.savefig(savepath + "1domainsim_rank_dropped.pdf")
 
 ### Compare to higher rank solution on 1 domain
 if option_error_estimate:
-
-    ### Setup grid and initial condition
-    grid_2 = Grid_2x1d(Nx, Ny, Nphi, r, _option_dd=option_grid, 
-                       _coeff=[c_adv, c_s, c_t])
-    lr0_2 = setInitialCondition_2x1d_lr(grid_2, option_cond="lattice")
-    f0_2 = lr0_2.U @ lr0_2.S @ lr0_2.V.T
-
-    # ### Run code and do the plotting
-    # lr_2, time_2, rank_adapted_2, rank_dropped_2 = integrate_1domain(
-    #                     lr0_2, grid_2, t_f, dt, source=source, 
-    #                     option_scheme=option_scheme, 
-    #                     option_timescheme=option_timescheme,
-    #                     option_bc=option_bc, tol_sing_val=tol_sing_val*0.001, 
-    #                     drop_tol=drop_tol*0.001, 
-    #                     tol_lattice=tol_lattice*0.001, snapshots=snapshots,
-    #                     plot_name_add = "high_rank_", 
-    #                     option_rank_adaptivity=option_rank_adaptivity)
     
     ### Copy data from already existing file
     data = np.load(f"data/reference_sol_{option_bc}_t{time[-1]:.4f}.npz")
@@ -227,3 +212,21 @@ if option_error_estimate:
     axes.set_xlim(time[0], time[-1]) # Remove extra padding: set x-limits to data range
     axes.tick_params(axis='both', which='major', labelsize=fs)
     plt.savefig(savepath + "high_rank_1domainsim_rank_dropped_2.pdf")
+
+    ### Plot error over time
+
+    fig, axes = plt.subplots(1, 1, figsize=(10, 8))
+    time_list = np.linspace(0, time[-1], len(Frob_list))
+
+    plt.plot(time_list, np.concatenate(([np.nan],Frob_list[1:])))
+
+    plt.yscale("log")
+    axes.set_xlabel("$t$", fontsize=fs)
+    axes.set_ylabel(r"$\left\| f - f_{\text{ref}} \right\|$", fontsize=fs)
+
+    axes.set_xlim(time_list[0], time_list[-1]) # Remove extra padding
+    idx = np.linspace(0, len(time_list) - 1, 5).astype(int)
+    axes.set_xticks(time_list[idx])
+    axes.tick_params(axis='both', which='major', labelsize=fs)
+    plt.tight_layout()
+    plt.savefig(savepath + "1d_" + option_bc + "_frobenius_error.pdf")  
