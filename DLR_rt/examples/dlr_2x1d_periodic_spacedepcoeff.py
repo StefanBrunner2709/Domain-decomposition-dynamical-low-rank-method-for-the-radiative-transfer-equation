@@ -26,6 +26,7 @@ option_timescheme = "RK4"
 option_rank_adaptivity = "v2"
 
 option_data_saves = 0
+option_save_last = True
 option_error_estimate = True
 option_error_list = 121 # hohlraum: 121, lattice: 71, pointsource: 101
 
@@ -230,3 +231,8 @@ if option_error_estimate:
     axes.tick_params(axis='both', which='major', labelsize=fs)
     plt.tight_layout()
     plt.savefig(savepath + "1d_" + option_bc + "_frobenius_error.pdf")  
+
+if option_save_last:
+    np.savez(f"data/final_sol_{option_bc}_t{time[-1]:.4f}.npz", 
+             U=lr.U, S=lr.S, V=lr.V, time=time, 
+             rank_int=rank_adapted, rank=rank_dropped)
