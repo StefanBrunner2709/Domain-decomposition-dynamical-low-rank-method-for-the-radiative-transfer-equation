@@ -30,10 +30,11 @@ option_rank_adaptivity = "v2"
 
 option_error_estimate = True
 option_error_list = 71
+option_dof_plot = True
 
-tol_sing_val = 2e-6
-drop_tol = 2e-6
-tol_lattice = 2e-6
+tol_sing_val = 6e-6
+drop_tol = 6e-6
+tol_lattice = 6e-6
 
 
 ### Initial configuration
@@ -93,3 +94,55 @@ if option_error_estimate:
     axes.tick_params(axis='both', which='major', labelsize=fs)
     plt.tight_layout()
     plt.savefig(savepath + "dd_lattice_frobenius_error.pdf")  
+
+if option_dof_plot:
+
+    ### Compute DoF for dd
+    dof_int_dd_list = []
+    for k in range(len(time)):
+        dof_int = 0
+        for j in range(7):
+            for i in range(7):
+                dof_int += (rank_on_subgrids_adapted[j][i][k] * 
+                        (subgrids[j][i].Nx * subgrids[j][i].Ny + 
+                         subgrids[j][i].Nphi + rank_on_subgrids_adapted[j][i][k]))
+        dof_int_dd_list.append(dof_int)
+
+    dof_dd_list = []
+    for k in range(len(time)):
+        dof = 0
+        for j in range(7):
+            for i in range(7):
+                dof += (rank_on_subgrids_dropped[j][i][k] * 
+                        (subgrids[j][i].Nx * subgrids[j][i].Ny + 
+                         subgrids[j][i].Nphi + rank_on_subgrids_dropped[j][i][k]))
+        dof_dd_list.append(dof)
+
+    ### Compute DoF for 1 domain
+    data = np.load(f"data/final_sol_lattice_t{time[-1]:.4f}.npz")
+    rank_adapted_2 = data["rank_int"]
+    rank_dropped_2 = data["rank"]
+
+    dof_int_1d_list = []
+    for i in range(len(time)):
+        dof_int = (rank_adapted_2[i] * (Nx * Ny + Nphi + rank_adapted_2[i]))
+        dof_int_1d_list.append(dof_int)
+
+    dof_1d_list = []
+    for i in range(len(time)):
+        dof = (rank_dropped_2[i] * (Nx * Ny + Nphi + rank_dropped_2[i]))
+        dof_1d_list.append(dof)
+
+    ### Plot DoF
+    fig, axes = plt.subplots(1, 1, figsize=(10, 8))
+
+    plt.plot(time, dof_int_dd_list, linestyle='--', color='red')
+    plt.plot(time, dof_dd_list, linestyle='-',  color='red')
+    plt.plot(time, dof_int_1d_list, linestyle='--', color='blue')
+    plt.plot(time, dof_1d_list, linestyle='-', color='blue')
+
+    axes.set_xlabel("$t$", fontsize=fs)
+    axes.set_ylabel("DoF", fontsize=fs)
+    axes.set_xlim(time[0], time[-1]) # Remove extra padding: set x-limits to data range
+    axes.tick_params(axis='both', which='major', labelsize=fs)
+    plt.savefig(savepath + "DoF_lattice.pdf")
