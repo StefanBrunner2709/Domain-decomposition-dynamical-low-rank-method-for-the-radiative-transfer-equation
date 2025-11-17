@@ -31,6 +31,7 @@ option_rank_adaptivity = "v2"
 
 option_error_estimate = True
 option_error_list = 121
+option_dof_plot = True
 
 tol_sing_val = 1e-7
 drop_tol = 1e-3
@@ -94,3 +95,55 @@ if option_error_estimate:
     axes.tick_params(axis='both', which='major', labelsize=fs)
     plt.tight_layout()
     plt.savefig(savepath + "dd_" + option_problem + "_frobenius_error.pdf")  
+
+if option_dof_plot:
+
+    ### Compute DoF for dd
+    dof_int_dd_list = []
+    for k in range(len(time)):
+        dof_int = 0
+        for j in range(5):
+            for i in range(5):
+                dof_int += (rank_on_subgrids_adapted[j][i][k] * 
+                        (subgrids[j][i].Nx * subgrids[j][i].Ny + 
+                         subgrids[j][i].Nphi + rank_on_subgrids_adapted[j][i][k]))
+        dof_int_dd_list.append(dof_int)
+
+    dof_dd_list = []
+    for k in range(len(time)):
+        dof = 0
+        for j in range(5):
+            for i in range(5):
+                dof += (rank_on_subgrids_dropped[j][i][k] * 
+                        (subgrids[j][i].Nx * subgrids[j][i].Ny + 
+                         subgrids[j][i].Nphi + rank_on_subgrids_dropped[j][i][k]))
+        dof_dd_list.append(dof)
+
+    ### Compute DoF for 1 domain
+    data = np.load(f"data/final_sol_{option_problem}_t{time[-1]:.4f}.npz")
+    rank_adapted_2 = data["rank_int"]
+    rank_dropped_2 = data["rank"]
+
+    dof_int_1d_list = []
+    for i in range(len(time)):
+        dof_int = (rank_adapted_2[i] * (Nx * Ny + Nphi + rank_adapted_2[i]))
+        dof_int_1d_list.append(dof_int)
+
+    dof_1d_list = []
+    for i in range(len(time)):
+        dof = (rank_dropped_2[i] * (Nx * Ny + Nphi + rank_dropped_2[i]))
+        dof_1d_list.append(dof)
+
+    ### Plot DoF
+    fig, axes = plt.subplots(1, 1, figsize=(10, 8))
+
+    plt.plot(time, dof_int_dd_list, linestyle='--', color='red')
+    plt.plot(time, dof_dd_list, linestyle='-',  color='red')
+    plt.plot(time, dof_int_1d_list, linestyle='--', color='blue')
+    plt.plot(time, dof_1d_list, linestyle='-', color='blue')
+
+    axes.set_xlabel("$t$", fontsize=fs)
+    axes.set_ylabel("DoF", fontsize=fs)
+    axes.set_xlim(time[0], time[-1]) # Remove extra padding: set x-limits to data range
+    axes.tick_params(axis='both', which='major', labelsize=fs)
+    plt.savefig(savepath + "DoF_" + option_problem + ".pdf")
