@@ -144,5 +144,12 @@ if option_dof_plot:
     axes.set_xlabel("$t$", fontsize=fs)
     axes.set_ylabel("DoF", fontsize=fs)
     axes.set_xlim(time[0], time[-1]) # Remove extra padding: set x-limits to data range
+    axes.set_ylim(bottom=0)
     axes.tick_params(axis='both', which='major', labelsize=fs)
+
+    xticks = axes.xaxis.get_major_ticks() 
+    xticks[0].label1.set_visible(False)
+
+    axes.yaxis.get_offset_text().set_fontsize(fs)
+
     plt.savefig(savepath + "DoF_lattice.pdf")
