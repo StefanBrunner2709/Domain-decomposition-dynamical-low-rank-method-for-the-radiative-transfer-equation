@@ -34,7 +34,7 @@ def integrate(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float, option: str = "li
                 dt = t_f - t
 
             if option == "lie":
-                lr, grid = PSI_lie(lr, grid, dt, DX=DX, DY=DY, dimensions="2x1d", 
+                lr, grid, _, _ = PSI_lie(lr, grid, dt, DX=DX, DY=DY, dimensions="2x1d", 
                                    option_scheme=option_scheme,
                                    DX_0=DX_0, DX_1=DX_1, DY_0=DY_0, DY_1=DY_1)
 
@@ -51,7 +51,7 @@ Ny = 128
 Nphi = 128
 dt = 0.95 / Ny
 r = 5
-t_f = 0.75
+t_f = 0.25
 fs = 16
 savepath = "plots/"
 method = "lie"
