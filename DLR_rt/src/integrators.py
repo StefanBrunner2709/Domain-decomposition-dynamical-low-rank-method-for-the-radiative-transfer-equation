@@ -310,7 +310,8 @@ def PSI_lie(lr, grid, dt, F_b=None, DX=None, DY=None, dimensions="1x1d",
 
     # Drop basis for adaptive rank strategy:
     if option_bc == "hohlraum" or option_bc == "pointsource":
-        lr, grid = drop_basis_functions(lr, grid, drop_tol, min_rank=min_rank)
+        lr, grid = drop_basis_functions(lr, grid, drop_tol, min_rank=min_rank, 
+                                        dimensions="2x1d")
     if option_bc == "lattice" or option_bc == "hohlraum" or option_bc == "pointsource":
         rank_dropped.append(grid.r)
 
@@ -503,7 +504,7 @@ def PSI_splitting_lie(
     lr.S *= np.sqrt(grid.dphi)
 
     ### Drop basis for adaptive rank strategy:
-    lr, grid = drop_basis_functions(lr, grid, drop_tol)
+    lr, grid = drop_basis_functions(lr, grid, drop_tol, dimensions="2x1d")
     
     if rank_dropped is not None:
         rank_dropped.append(grid.r)
@@ -559,7 +560,7 @@ def PSI_splitting_lie(
     lr.S *= np.sqrt(grid.dphi)
 
     ### Drop basis for adaptive rank strategy:
-    lr, grid = drop_basis_functions(lr, grid, drop_tol)
+    lr, grid = drop_basis_functions(lr, grid, drop_tol, dimensions="2x1d")
 
     # Step 3: collisions and source
 
@@ -687,7 +688,7 @@ def PSI_splitting_strang(
     lr.S *= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
 
     ### Drop basis for adaptive rank strategy:
-    lr, grid = drop_basis_functions(lr, grid, drop_tol)
+    lr, grid = drop_basis_functions(lr, grid, drop_tol, dimensions="2x1d")
 
     # Step 2: advection in y
 
@@ -754,7 +755,7 @@ def PSI_splitting_strang(
     lr.S *= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
 
     ### Drop basis for adaptive rank strategy:
-    lr, grid = drop_basis_functions(lr, grid, drop_tol)
+    lr, grid = drop_basis_functions(lr, grid, drop_tol, dimensions="2x1d")
     if rank_dropped is not None:
         rank_dropped.append(grid.r)
 

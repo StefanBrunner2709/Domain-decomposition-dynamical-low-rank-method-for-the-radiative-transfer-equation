@@ -40,7 +40,7 @@ def integrate(
 
             ### Run PSI
             if option == "lie":
-                lr, grid = PSI_lie(lr, grid, dt, F_b)
+                lr, grid, _, _  = PSI_lie(lr, grid, dt, F_b)
 
             if option == "strang":
                 lr, grid = PSI_strang(lr, grid, dt, t, F_b)

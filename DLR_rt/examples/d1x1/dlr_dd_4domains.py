@@ -72,7 +72,7 @@ def integrate(
 
             ### Run PSI
             if option == "lie":
-                lr_1, grid_1 = PSI_lie(lr_1, grid_1, dt, F_b_1)
+                lr_1, grid_1, _, _ = PSI_lie(lr_1, grid_1, dt, F_b_1)
 
             if option == "strang":
                 lr_1, grid_1 = PSI_strang(lr_1, grid_1, dt, t, F_b_1)
@@ -87,7 +87,7 @@ def integrate(
 
             ### Run PSI
             if option == "lie":
-                lr_2, grid_2 = PSI_lie(lr_2, grid_2, dt, F_b_2)
+                lr_2, grid_2, _, _ = PSI_lie(lr_2, grid_2, dt, F_b_2)
 
             if option == "strang":
                 lr_2, grid_2 = PSI_strang(lr_2, grid_2, dt, t, F_b_2)
@@ -102,7 +102,7 @@ def integrate(
 
             ### Run PSI
             if option == "lie":
-                lr_3, grid_3 = PSI_lie(lr_3, grid_3, dt, F_b_3)
+                lr_3, grid_3, _, _ = PSI_lie(lr_3, grid_3, dt, F_b_3)
 
             if option == "strang":
                 lr_3, grid_3 = PSI_strang(lr_3, grid_3, dt, t, F_b_3)
@@ -117,7 +117,7 @@ def integrate(
 
             ### Run PSI
             if option == "lie":
-                lr_4, grid_4 = PSI_lie(lr_4, grid_4, dt, F_b_4)
+                lr_4, grid_4, _, _ = PSI_lie(lr_4, grid_4, dt, F_b_4)
 
             if option == "strang":
                 lr_4, grid_4 = PSI_strang(lr_4, grid_4, dt, t, F_b_4)

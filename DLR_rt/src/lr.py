@@ -1572,13 +1572,21 @@ def add_basis_functions(
 
     # Compute SVD and drop singular values
     X, sing_val, QT = np.linalg.svd(F_b, full_matrices=False)
+    if dimensions == "1x1d":
+        X /= np.sqrt(grid.dx)
+        sing_val *= np.sqrt(grid.dx * grid.dmu)
+        QT /= np.sqrt(grid.dmu)
+    elif dimensions == "2x1d":
+        X /= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
+        sing_val *= np.sqrt(grid.dx * grid.dy * grid.dphi)
+        QT /= np.sqrt(grid.dphi)
 
-    X /= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
-    sing_val *= np.sqrt(grid.dx * grid.dy * grid.dphi)
-    QT /= np.sqrt(grid.dphi)
-
-    r_b = np.sum(sing_val > tol_sing_val * np.sqrt(grid.Nx*grid.Ny*grid.Nphi*
-                                                (grid.dx*grid.dy*grid.dphi)))
+    if dimensions == "1x1d":
+        r_b = np.sum(sing_val > tol_sing_val * np.sqrt(grid.Nx*grid.Nmu*
+                                                (grid.dx*grid.dmu)))
+    elif dimensions == "2x1d":
+        r_b = np.sum(sing_val > tol_sing_val * np.sqrt(grid.Nx*grid.Ny*grid.Nphi*
+                                                    (grid.dx*grid.dy*grid.dphi)))
     
     if dimensions == "1x1d" and (
         grid.r + r_b
@@ -1710,7 +1718,7 @@ def add_basis_functions_v2(
     return lr, grid
 
 
-def drop_basis_functions(lr, grid, drop_tol, min_rank : int = 5):
+def drop_basis_functions(lr, grid, drop_tol, min_rank : int = 5, dimensions="1x1d"):
     """
     Drop basis functions.
 
@@ -1727,6 +1735,8 @@ def drop_basis_functions(lr, grid, drop_tol, min_rank : int = 5):
         Tolerance for dropping singular values.
     min_rank
         Minimum rank for the low rank structure.
+    dimensions
+        Can be chosen "1x1d" or "2x1d".
     """
     U, sing_val, QT = np.linalg.svd(lr.S, full_matrices=False)
 
@@ -1734,10 +1744,16 @@ def drop_basis_functions(lr, grid, drop_tol, min_rank : int = 5):
 
     r_prime = len(sing_val)
     sum_drop = (sing_val[-1]**2)
-    while sum_drop < (drop_tol * np.sqrt(grid.Nx*grid.Ny*grid.Nphi*
-                                       (grid.dx*grid.dy*grid.dphi)))**2 and r_prime > 0:
-        r_prime -= 1
-        sum_drop += (sing_val[r_prime-1]**2)
+    if dimensions == "1x1d":
+        while sum_drop < (drop_tol * np.sqrt(grid.Nx*grid.Nmu*
+                                       (grid.dx*grid.dmu)))**2 and r_prime > 0:
+            r_prime -= 1
+            sum_drop += (sing_val[r_prime-1]**2)
+    elif dimensions == "2x1d":
+        while sum_drop < (drop_tol * np.sqrt(grid.Nx*grid.Ny*grid.Nphi*
+                                    (grid.dx*grid.dy*grid.dphi)))**2 and r_prime > 0:
+            r_prime -= 1
+            sum_drop += (sing_val[r_prime-1]**2)
     
     if r_prime < min_rank:
         r_prime = min_rank
