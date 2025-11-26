@@ -163,7 +163,7 @@ y_max = max(np.max(rank_adapted), np.max(rank_dropped)) + 1
 fig, axes = plt.subplots(1, 1, figsize=(10, 8))
 plt.plot(time, rank_adapted)
 axes.set_xlabel("$t$", fontsize=fs)
-axes.set_ylabel("$r(t)$", fontsize=fs)
+axes.set_ylabel(r"$r_{\text{int}}(t)$", fontsize=fs)
 axes.set_xlim(time[0], time[-1]) # Remove extra padding: set x-limits to data range  
 axes.set_ylim(y_min, y_max)
 axes.tick_params(axis='both', which='major', labelsize=fs)

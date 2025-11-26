@@ -373,7 +373,7 @@ def plot_ranks_subgrids(subgrids, time,
             plt.plot(time,  rank_on_subgrids_adapted[j][i])
 
     axes.set_xlabel("$t$", fontsize=fs)
-    axes.set_ylabel("$r(t)$", fontsize=fs)
+    axes.set_ylabel(r"$r_{\text{int}}(t)$", fontsize=fs)
     axes.set_xlim(time[0], time[-1]) # Remove extra padding: set x-limits to data range
     axes.set_ylim(y_min, y_max) 
     axes.tick_params(axis='both', which='major', labelsize=fs)
