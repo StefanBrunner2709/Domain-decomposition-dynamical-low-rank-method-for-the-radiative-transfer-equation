@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from DLR_rt.examples.dlr_2x1d_periodic import integrate
+from DLR_rt.examples.d2x1.dlr_2x1d_periodic import integrate
 from DLR_rt.src.grid import Grid_2x1d
 from DLR_rt.src.initial_condition import setInitialCondition_2x1d_lr
 
