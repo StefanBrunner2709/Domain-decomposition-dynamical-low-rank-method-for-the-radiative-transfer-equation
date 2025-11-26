@@ -77,6 +77,7 @@ def run_dd_hohlraum(option_problem = "hohlraum", option_error_estimate = False,
         lr0_on_subgrids, subgrids, t_f, dt, option_scheme=option_scheme, 
         drop_tol=drop_tol, 
         option_problem=option_problem_int, snapshots=snapshots,
+        plot_name_add=option_problem,
         option_rank_adaptivity=option_rank_adaptivity, 
         grid = grid, option_error_list = option_error_list
         )

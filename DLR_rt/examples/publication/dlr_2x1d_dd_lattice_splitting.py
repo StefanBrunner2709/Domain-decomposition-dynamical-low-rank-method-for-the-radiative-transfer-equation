@@ -64,13 +64,15 @@ def run_dd_lattice(option_error_estimate = False, option_dof_plot = False):
     Frob_list) = integrate_dd_lattice(
         lr0_on_subgrids, subgrids, t_f, dt, 
         option_scheme=option_scheme, option_timescheme=option_timescheme,
-        drop_tol=drop_tol, snapshots=snapshots, 
+        drop_tol=drop_tol, snapshots=snapshots,
+        plot_name_add="lattice",
         option_rank_adaptivity=option_rank_adaptivity,
         grid = grid, option_error_list = option_error_list
         )
 
     plot_ranks_subgrids(subgrids, time, 
-                        rank_on_subgrids_adapted, rank_on_subgrids_dropped)
+                        rank_on_subgrids_adapted, rank_on_subgrids_dropped,
+                        plot_name_add="lattice")
 
 
     ### Compare to higher rank solution on 1 domain
