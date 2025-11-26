@@ -2,3 +2,4 @@ plots
 __pycache__
 dlr-rt
 data
+.vscode
