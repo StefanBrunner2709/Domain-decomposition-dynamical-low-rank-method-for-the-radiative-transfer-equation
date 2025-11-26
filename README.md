@@ -1,5 +1,5 @@
 # Domain-decomposition-dynamical-low-rank-method-for-the-radiative-transfer-equation
-Dynamical low rank solver for the 1x1 dimensional and 2x1 dimensional radiative transfer equation, with and without domain decomposition. Can be used to reproduce the numerical experiments in the paper "Domain decomposition dynamical low-rank method for the radiative transfer equation" by Brunner, S., Lukas, L. and Haut, T.
+Dynamical low rank solver for the 1x1 dimensional and 2x1 dimensional radiative transfer equation, with and without domain decomposition. Can be used to reproduce the numerical experiments in the paper "Domain decomposition dynamical low-rank method for the radiative transfer equation" by Brunner, S., Einkemmer, L. and Haut, T.
 
 ## Installation
 Install with `pip` or `uv` by
