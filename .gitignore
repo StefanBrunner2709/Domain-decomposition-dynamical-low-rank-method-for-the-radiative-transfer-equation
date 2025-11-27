@@ -1,5 +1,7 @@
-plots
+plots/*
+!plots/.gitkeep
 __pycache__
 dlr-rt
-data
+data/*
+!data/.gitkeep
 .vscode
