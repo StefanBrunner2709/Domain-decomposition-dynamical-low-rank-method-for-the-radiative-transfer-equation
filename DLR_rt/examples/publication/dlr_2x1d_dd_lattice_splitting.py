@@ -110,6 +110,7 @@ def run_dd_lattice(option_error_estimate = False, option_dof_plot = False):
         axes.tick_params(axis='both', which='major', labelsize=fs)
         plt.tight_layout()
         plt.savefig(savepath + "dd_lattice_frobenius_error.pdf")  
+        plt.close()
 
     if option_dof_plot:
 
@@ -169,5 +170,6 @@ def run_dd_lattice(option_error_estimate = False, option_dof_plot = False):
         axes.yaxis.get_offset_text().set_fontsize(fs)
 
         plt.savefig(savepath + "DoF_lattice.pdf")
+        plt.close()
 
         return

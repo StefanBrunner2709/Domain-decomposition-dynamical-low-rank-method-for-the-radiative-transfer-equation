@@ -143,6 +143,7 @@ def run_1d(option_problem = "hohlraum", option_calculate_ref = False,
 
     plt.tight_layout()
     plt.savefig(savepath + "setup_" + option_problem + ".pdf", bbox_inches="tight")
+    plt.close()
 
     ### Plot source
     extent = [grid.X[0], grid.X[-1], grid.Y[0], grid.Y[-1]]
@@ -172,6 +173,7 @@ def run_1d(option_problem = "hohlraum", option_calculate_ref = False,
 
     plt.tight_layout()
     plt.savefig(savepath + "source_" + option_problem + ".pdf", bbox_inches="tight")
+    plt.close()
 
     # Prepare source for code
     source = source.flatten()[:, None]
@@ -191,27 +193,29 @@ def run_1d(option_problem = "hohlraum", option_calculate_ref = False,
 
 
     ### Plot for rank over time
+    if not option_calculate_ref:
+        y_min = min(np.min(rank_adapted), np.min(rank_dropped)) - 1
+        y_max = max(np.max(rank_adapted), np.max(rank_dropped)) + 1
 
-    y_min = min(np.min(rank_adapted), np.min(rank_dropped)) - 1
-    y_max = max(np.max(rank_adapted), np.max(rank_dropped)) + 1
+        fig, axes = plt.subplots(1, 1, figsize=(10, 8))
+        plt.plot(time, rank_adapted)
+        axes.set_xlabel("$t$", fontsize=fs)
+        axes.set_ylabel(r"$r_{\text{int}}(t)$", fontsize=fs)
+        axes.set_xlim(time[0], time[-1]) # Remove padding: set x-limits to data range
+        axes.set_ylim(y_min, y_max)
+        axes.tick_params(axis='both', which='major', labelsize=fs)
+        plt.savefig(savepath + option_problem + "_1domainsim_rank_adapted.pdf")
+        plt.close()
 
-    fig, axes = plt.subplots(1, 1, figsize=(10, 8))
-    plt.plot(time, rank_adapted)
-    axes.set_xlabel("$t$", fontsize=fs)
-    axes.set_ylabel(r"$r_{\text{int}}(t)$", fontsize=fs)
-    axes.set_xlim(time[0], time[-1]) # Remove extra padding: set x-limits to data range
-    axes.set_ylim(y_min, y_max)
-    axes.tick_params(axis='both', which='major', labelsize=fs)
-    plt.savefig(savepath + option_problem + "_1domainsim_rank_adapted.pdf")
-
-    fig, axes = plt.subplots(1, 1, figsize=(10, 8))
-    plt.plot(time, rank_dropped)
-    axes.set_xlabel("$t$", fontsize=fs)
-    axes.set_ylabel("$r(t)$", fontsize=fs)
-    axes.set_xlim(time[0], time[-1]) # Remove extra padding: set x-limits to data range
-    axes.set_ylim(y_min, y_max)
-    axes.tick_params(axis='both', which='major', labelsize=fs)  
-    plt.savefig(savepath + option_problem + "_1domainsim_rank_dropped.pdf")
+        fig, axes = plt.subplots(1, 1, figsize=(10, 8))
+        plt.plot(time, rank_dropped)
+        axes.set_xlabel("$t$", fontsize=fs)
+        axes.set_ylabel("$r(t)$", fontsize=fs)
+        axes.set_xlim(time[0], time[-1]) # Remove padding: set x-limits to data range
+        axes.set_ylim(y_min, y_max)
+        axes.tick_params(axis='both', which='major', labelsize=fs)  
+        plt.savefig(savepath + option_problem + "_1domainsim_rank_dropped.pdf")
+        plt.close()
 
 
     ### Compare to higher rank solution on 1 domain
@@ -247,6 +251,7 @@ def run_1d(option_problem = "hohlraum", option_calculate_ref = False,
         axes.tick_params(axis='both', which='major', labelsize=fs)
         plt.tight_layout()
         plt.savefig(savepath + "1d_" + option_problem + "_frobenius_error.pdf")  
+        plt.close()
 
     if option_save_last:
         np.savez(f"data/final_sol_{option_problem}_t{time[-1]:.4f}.npz", 

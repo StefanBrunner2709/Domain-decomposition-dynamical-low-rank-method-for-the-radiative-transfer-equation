@@ -120,7 +120,8 @@ def run_dd_hohlraum(option_problem = "hohlraum", option_error_estimate = False,
         axes.set_xticks(time_list[idx])
         axes.tick_params(axis='both', which='major', labelsize=fs)
         plt.tight_layout()
-        plt.savefig(savepath + "dd_" + option_problem + "_frobenius_error.pdf")  
+        plt.savefig(savepath + "dd_" + option_problem + "_frobenius_error.pdf") 
+        plt.close() 
 
     if option_dof_plot:
 
@@ -180,5 +181,6 @@ def run_dd_hohlraum(option_problem = "hohlraum", option_error_estimate = False,
         axes.yaxis.get_offset_text().set_fontsize(fs)
 
         plt.savefig(savepath + "DoF_" + option_problem + ".pdf")
+        plt.close()
 
     return

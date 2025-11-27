@@ -379,6 +379,7 @@ def plot_ranks_subgrids(subgrids, time,
     axes.tick_params(axis='both', which='major', labelsize=fs)
     plt.savefig(savepath + plot_name_add 
                 + "dd_splitting_2x1d_subgrids_rank_adapted.pdf")
+    plt.close()
 
     fig, axes = plt.subplots(1, 1, figsize=(10, 8))
     for j in range(n_split_y):
@@ -393,6 +394,7 @@ def plot_ranks_subgrids(subgrids, time,
     axes.tick_params(axis='both', which='major', labelsize=fs)
     plt.savefig(savepath + plot_name_add 
                 + "dd_splitting_2x1d_subgrids_rank_dropped.pdf")
+    plt.close()
 
     ### Plot for final rank
 
@@ -458,6 +460,7 @@ def plot_ranks_subgrids(subgrids, time,
 
     plt.savefig(savepath + plot_name_add 
                 + "dd_splitting_2x1d_subgrids_rank_adapted_final.pdf")
+    plt.close()
 
     # Example data for each cell (ny rows, nx columns)
     data = np.zeros((n_split_x, n_split_y))
