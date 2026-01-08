@@ -462,7 +462,7 @@ def PSI_splitting_lie(
 
 
     if rank_adapted is not None:
-        rank_adapted.append(grid.r)
+        rank_adapted_x = grid.r
 
     # K step
     C1, C2 = computeC(lr, grid, dimensions="2x1d")
@@ -505,9 +505,6 @@ def PSI_splitting_lie(
 
     ### Drop basis for adaptive rank strategy:
     lr, grid = drop_basis_functions(lr, grid, drop_tol, dimensions="2x1d")
-    
-    if rank_dropped is not None:
-        rank_dropped.append(grid.r)
 
     # Step 2: advection in y
 
@@ -520,6 +517,10 @@ def PSI_splitting_lie(
         lr, grid = add_basis_functions_v2(
             lr, grid, F_b_top_bottom, drop_tol
         )
+
+    if rank_adapted is not None:
+        rank_adapted_y = grid.r
+        rank_adapted.append(max(rank_adapted_x, rank_adapted_y))
 
     # K step
     C1, C2 = computeC(lr, grid, dimensions="2x1d")
@@ -561,6 +562,9 @@ def PSI_splitting_lie(
 
     ### Drop basis for adaptive rank strategy:
     lr, grid = drop_basis_functions(lr, grid, drop_tol, dimensions="2x1d")
+
+    if rank_dropped is not None:
+        rank_dropped.append(grid.r)
 
     # Step 3: collisions and source
 
