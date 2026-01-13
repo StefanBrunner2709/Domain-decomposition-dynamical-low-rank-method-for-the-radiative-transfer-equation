@@ -70,7 +70,7 @@ def run_1d(option_problem = "hohlraum", option_calculate_ref = False,
             tol_lattice = 1e-10
             snapshots = 0
         else:
-            drop_tol = 1e-4
+            drop_tol = 1e-5
             tol_lattice = 3e-5
             snapshots = 11
         option_data_saves = 101 if option_calculate_ref else 0

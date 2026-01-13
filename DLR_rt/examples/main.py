@@ -66,12 +66,11 @@ if __name__ == "__main__":
     # ---- POINTSOURCE EXAMPLE ----
     if "pointsource" in to_run:
         ### Run isotropic pointsource example
-        # Simulation with larger tolerance
-        print("Running pointsource simulation with domain " + 
-              "decomposition and large tolerance...")
-        run_dd_hohlraum(option_problem="pointsource")
+        # Simulation on a single domain
+        print("Running pointsource simulation on 1 domain...")
+        run_1d(option_problem="pointsource")
 
-        # Simulation with smaller tolerance
-        print("Running pointsource simulation with domain " + 
-              "decomposition and small tolerance...")
-        run_dd_hohlraum(option_problem="pointsource_2")
+        # Simulation with domain decomposition
+        print("Running pointsource simulation with domain decomposition...")
+        run_dd_hohlraum(option_problem="pointsource", option_dof_plot=True)
+        
