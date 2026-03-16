@@ -4,6 +4,8 @@ Contains classes and functions to set up low rank structure.
 
 import numpy as np
 
+from DLR_rt.src.util import computeD_upwind_1x1d
+
 
 class LR:
     """
@@ -541,8 +543,8 @@ def computeK_bdry_2x1d_Y(lr, grid, F_b_Y):
 
     return K_bdry_bottom, K_bdry_top
 
-
-def computedxK(lr, K_bdry_left, K_bdry_right, grid):
+def computedxK(lr, K_bdry_left, K_bdry_right, grid, option_scheme="cendiff", 
+               P_0="None", eigvals="None"):
     """
     Compute the derivative of K.
 
@@ -561,14 +563,38 @@ def computedxK(lr, K_bdry_left, K_bdry_right, grid):
     """
     K = lr.U @ lr.S
 
-    Dx = np.zeros((grid.Nx, grid.Nx), dtype=int)
-    np.fill_diagonal(Dx[1:], -1)
-    np.fill_diagonal(Dx[:, 1:], 1)
+    if option_scheme == "cendiff":
+        Dx = np.zeros((grid.Nx, grid.Nx), dtype=int)
+        np.fill_diagonal(Dx[1:], -1)
+        np.fill_diagonal(Dx[:, 1:], 1)
 
-    dxK = Dx @ K / (2 * grid.dx)
+        dxK = Dx @ K / (2 * grid.dx)
+        dxK[0, :] -= K_bdry_left / (2 * grid.dx)
+        dxK[-1, :] += K_bdry_right / (2 * grid.dx)
+    
+    elif option_scheme == "upwind":
+        DX_0, DX_1 = computeD_upwind_1x1d(grid, option_bc="inflow")
 
-    dxK[0, :] -= K_bdry_left / (2 * grid.dx)
-    dxK[-1, :] += K_bdry_right / (2 * grid.dx)
+        ### Compute DX
+
+        # Project into eigenbasis
+        KP_0 = K @ P_0
+
+        # Set up upwind matrices without boundary information
+        dxK_0 = DX_0 @ KP_0
+        dxK_1 = DX_1 @ KP_0
+
+        # Add boundary information to those matrices
+        dxK_0[0, :] -= K_bdry_left @ P_0 / grid.dx
+        dxK_1[-1, :] += K_bdry_right @ P_0 / grid.dx
+
+        # calculate DXK
+        dxK = np.zeros((grid.Nx,grid.r))
+        for i in range(grid.r):
+            if eigvals[i] > 0:
+                dxK[:,i] = dxK_0[:,i]
+            else:
+                dxK[:,i] = dxK_1[:,i]
 
     return dxK
 
@@ -948,13 +974,30 @@ def Kstep(
     """
     if dimensions == "1x1d":
         if inflow:
-            K_bdry_left, K_bdry_right = computeK_bdry(lr, grid, F_b)
-            dxK = computedxK(lr, K_bdry_left, K_bdry_right, grid)
-            rhs = (
-                -(grid.coeff) * dxK @ C1
-                + 0.5 * (grid.coeff) ** 2 * K @ C2.T @ C2
-                - (grid.coeff) ** 2 * K
-            )
+            if option_scheme == "cendiff":
+                K_bdry_left, K_bdry_right = computeK_bdry(lr, grid, F_b)
+                dxK = computedxK(lr, K_bdry_left, K_bdry_right, grid)
+                rhs = (
+                    -(grid.coeff) * dxK @ C1
+                    + 0.5 * (grid.coeff) ** 2 * K @ C2.T @ C2
+                    - (grid.coeff) ** 2 * K
+                )
+            elif option_scheme == "upwind":
+                K_bdry_left, K_bdry_right = computeK_bdry(lr, grid, F_b)
+
+                ### Diagonalize matrix C
+                # Eigen-decomposition
+                eigvals, P_0 = np.linalg.eigh(C1)
+                # Construct diagonal matrix of eigenvalues
+                T1_0 = np.diag(eigvals)
+
+                dxK = computedxK(lr, K_bdry_left, K_bdry_right, grid, 
+                                 option_scheme="upwind", P_0=P_0, eigvals=eigvals)
+                rhs = (
+                    -(grid.coeff) * dxK @ T1_0 @ P_0.T
+                    + 0.5 * (grid.coeff) ** 2 * K @ C2.T @ C2
+                    - (grid.coeff) ** 2 * K
+                )
 
         else:
             dxK = 0.5 * (np.roll(K, -1, axis=0) - np.roll(K, 1, axis=0)) / grid.dx

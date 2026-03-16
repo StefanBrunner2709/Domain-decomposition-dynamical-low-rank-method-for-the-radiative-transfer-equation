@@ -40,7 +40,7 @@ def integrate(
 
             ### Run PSI
             if option == "lie":
-                lr, grid, _, _  = PSI_lie(lr, grid, dt, F_b)
+                lr, grid, _, _  = PSI_lie(lr, grid, dt, F_b, option_scheme="upwind")
 
             if option == "strang":
                 lr, grid = PSI_strang(lr, grid, dt, t, F_b)
@@ -106,9 +106,9 @@ def integrate(
 
 Nx = 64
 Nmu = 64
-dt = 1e-4
+dt = 1e-3
 r = 5
-t_f = 0.5
+t_f = 1.0
 fs = 22
 method = "lie"
 savepath = "plots/"
@@ -125,8 +125,8 @@ f = lr.U @ lr.S @ lr.V.T
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
 
-# im = ax1.imshow(f.T, extent=extent, origin='lower', aspect=0.5)
-im = ax1.imshow(f.T, extent=extent, origin="lower", aspect=0.5, vmin=0.0, vmax=1.0)
+im = ax1.imshow(f.T, extent=extent, origin='lower', aspect=0.5)
+# im = ax1.imshow(f.T, extent=extent, origin="lower", aspect=0.5, vmin=0.0, vmax=1.0)
 ax1.set_xlabel("$x$", fontsize=fs)
 ax1.set_ylabel(r"$\mu$", fontsize=fs, labelpad=-5)
 ax1.set_xticks([0, 0.5, 1])
@@ -137,7 +137,7 @@ ax1.set_title(r"$f(t,x,\mu)$", fontsize=fs)
 cbar_fixed = fig.colorbar(im, ax=ax1, shrink=1)
 # cbar_fixed.set_ticks([np.ceil(np.min(f)*10000)/10000,
 #                       np.floor(np.max(f)*10000)/10000])
-cbar_fixed.set_ticks([0, 0.5, 1])
+cbar_fixed.set_ticks([np.min(f), np.max(f)])
 cbar_fixed.ax.tick_params(labelsize=fs)
 
 ax2.plot(time, rank)
