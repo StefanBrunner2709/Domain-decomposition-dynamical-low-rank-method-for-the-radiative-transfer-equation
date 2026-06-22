@@ -94,7 +94,7 @@ def run_dd_hohlraum(option_problem = "hohlraum", option_error_estimate = False,
                             1, _X = subgrids[j][-1].X, _Y = subgrids[j][-1].Y, 
                             _coeff=[1.0, 1.0, 1.0])
         lr_b_r = setInitialCondition_2x1d_lr(grid_b_r, 
-                                             option_cond="almost_zero")
+                                             option_cond="zero")
         grid_boundary_right.append(grid_b_r)
         lr_boundary_right.append(lr_b_r)
         
@@ -109,7 +109,7 @@ def run_dd_hohlraum(option_problem = "hohlraum", option_error_estimate = False,
                             1, _X = subgrids[-1][i].X, _Y = subgrids[-1][i].Y, 
                             _coeff=[1.0, 1.0, 1.0])
         lr_b_t = setInitialCondition_2x1d_lr(grid_b_t, 
-                                             option_cond="almost_zero")
+                                             option_cond="zero")
         grid_boundary_top.append(grid_b_t)
         lr_boundary_top.append(lr_b_t)
 
@@ -117,7 +117,7 @@ def run_dd_hohlraum(option_problem = "hohlraum", option_error_estimate = False,
                             1, _X = subgrids[0][i].X, _Y = subgrids[0][i].Y, 
                             _coeff=[1.0, 1.0, 1.0])
         lr_b_b = setInitialCondition_2x1d_lr(grid_b_b, 
-                                             option_cond="almost_zero")
+                                             option_cond="zero")
         grid_boundary_bottom.append(grid_b_b)
         lr_boundary_bottom.append(lr_b_b)
 

@@ -66,7 +66,7 @@ def run_dd_lattice(option_error_estimate = False, option_dof_plot = False):
                             1, _X = subgrids[0][0].X, _Y = subgrids[0][0].Y, 
                             _coeff=[1.0, 1.0, 1.0])
     lr_boundary = setInitialCondition_2x1d_lr(grid_boundary_neigboring, 
-                                              option_cond="almost_zero")
+                                              option_cond="zero")
 
     ### Final configuration
     (lr_on_subgrids, time, 

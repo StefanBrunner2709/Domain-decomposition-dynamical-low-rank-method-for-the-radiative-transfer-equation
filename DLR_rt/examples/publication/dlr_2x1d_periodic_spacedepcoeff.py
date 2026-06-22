@@ -102,13 +102,13 @@ def run_1d(option_problem = "hohlraum", option_calculate_ref = False,
         grid_neigboring = Grid_2x1d(Nx, Ny, Nphi, 1, _option_dd=option_grid,
                                     _coeff=[c_adv, c_s, c_t])
         lr_left = setInitialCondition_2x1d_lr(grid_neigboring, 
-                                              option_cond="almost_zero")
+                                              option_cond="zero")
         lr_right = setInitialCondition_2x1d_lr(grid_neigboring, 
-                                              option_cond="almost_zero")
+                                              option_cond="zero")
         lr_top = setInitialCondition_2x1d_lr(grid_neigboring, 
-                                             option_cond="almost_zero")
+                                             option_cond="zero")
         lr_bottom = setInitialCondition_2x1d_lr(grid_neigboring, 
-                                                option_cond="almost_zero")
+                                                option_cond="zero")
 
     elif option_problem == "hohlraum":
         ### Setup neighboring domains (left 1 because of hohlraum simulation)
@@ -117,11 +117,11 @@ def run_1d(option_problem = "hohlraum", option_calculate_ref = False,
         lr_left = setInitialCondition_2x1d_lr(grid_neigboring, 
                                               option_cond="one_inflow_left")
         lr_right = setInitialCondition_2x1d_lr(grid_neigboring, 
-                                               option_cond="almost_zero")
+                                               option_cond="zero")
         lr_top = setInitialCondition_2x1d_lr(grid_neigboring, 
-                                             option_cond="almost_zero")
+                                             option_cond="zero")
         lr_bottom = setInitialCondition_2x1d_lr(grid_neigboring, 
-                                                option_cond="almost_zero")
+                                                option_cond="zero")
 
     elif option_problem == "pointsource":
         ### Setup neighboring domains (left gaussian because of point source simulation)
@@ -130,11 +130,11 @@ def run_1d(option_problem = "hohlraum", option_calculate_ref = False,
         lr_left = setInitialCondition_2x1d_lr(grid_neigboring, 
                                             option_cond="gaussian_inflow_left")
         lr_right = setInitialCondition_2x1d_lr(grid_neigboring, 
-                                               option_cond="almost_zero")
+                                               option_cond="zero")
         lr_top = setInitialCondition_2x1d_lr(grid_neigboring, 
-                                             option_cond="almost_zero")
+                                             option_cond="zero")
         lr_bottom = setInitialCondition_2x1d_lr(grid_neigboring, 
-                                                option_cond="almost_zero")
+                                                option_cond="zero")
 
     ### Plot lattice
     extent = [grid.X[0], grid.X[-1], grid.Y[0], grid.Y[-1]]

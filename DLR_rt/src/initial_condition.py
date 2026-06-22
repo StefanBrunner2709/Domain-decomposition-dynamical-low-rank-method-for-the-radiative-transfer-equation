@@ -105,7 +105,7 @@ def setInitialCondition_2x1d_lr(grid: Grid_2x1d, option_cond: str = "standard"):
         S[0, 0] = 1.0
     
     elif option_cond == "lattice":
-        U[:,0] = 1e-9
+        U[:,0] = 0.0
         # V[8, 0] = 1.0
         V[:,0] = 1.0 / grid.Nphi
         S[0,0] = 1.0
@@ -132,8 +132,8 @@ def setInitialCondition_2x1d_lr(grid: Grid_2x1d, option_cond: str = "standard"):
         V = V[:,:grid.r]
         S = np.diag(S[:grid.r])
 
-    elif option_cond == "almost_zero":
-        S = np.ones((grid.r, grid.r)) * 1e-9
+    elif option_cond == "zero":
+        S = np.zeros((grid.r, grid.r))
         U = np.random.rand(grid.Nx * grid.Ny, grid.r)
         V = np.random.rand(grid.Nphi, grid.r)
 
@@ -206,7 +206,7 @@ def setInitialCondition_2x1d_lr_subgrids(subgrids, option_cond: str = "standard"
                 S[0, 0] = 1.0
 
             elif option_cond == "lattice":
-                U[:,0] = 1e-9
+                U[:,0] = 0.0
                 #V[0, 0] = 1.0
                 V[:,0] = 1.0 / subgrids[j][i].Nphi
                 S[0,0] = 1.0
