@@ -3,6 +3,7 @@ import numpy as np
 
 from DLR_rt.src.grid import Grid_2x1d
 from DLR_rt.src.initial_condition import (
+    setInitialCondition_2x1d_lr,
     setInitialCondition_2x1d_lr_subgrids,
 )
 from DLR_rt.src.lr import LR
@@ -46,7 +47,7 @@ def run_dd_lattice(option_error_estimate = False, option_dof_plot = False):
 
     option_error_list = 71 if option_error_estimate else 0
 
-    drop_tol = 6e-6
+    drop_tol = 1e-5
 
 
     ### Initial configuration
@@ -57,6 +58,15 @@ def run_dd_lattice(option_error_estimate = False, option_dof_plot = False):
 
     lr0_on_subgrids = setInitialCondition_2x1d_lr_subgrids(subgrids, 
                                                            option_cond="lattice")
+    
+    ### Setup boundary neighbouring domains (all 0 because of lattice simulation)
+    n_split_y = 7
+    n_split_x = 7
+    grid_boundary_neigboring = Grid_2x1d(int(Nx/n_split_x), int(Ny/n_split_y), Nphi, 
+                            1, _X = subgrids[0][0].X, _Y = subgrids[0][0].Y, 
+                            _coeff=[1.0, 1.0, 1.0])
+    lr_boundary = setInitialCondition_2x1d_lr(grid_boundary_neigboring, 
+                                              option_cond="almost_zero")
 
     ### Final configuration
     (lr_on_subgrids, time, 
@@ -67,7 +77,8 @@ def run_dd_lattice(option_error_estimate = False, option_dof_plot = False):
         drop_tol=drop_tol, snapshots=snapshots,
         plot_name_add="lattice",
         option_rank_adaptivity=option_rank_adaptivity,
-        grid = grid, option_error_list = option_error_list
+        grid = grid, option_error_list = option_error_list,
+        lr_boundary = lr_boundary
         )
 
     plot_ranks_subgrids(subgrids, time, 

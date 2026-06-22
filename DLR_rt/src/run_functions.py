@@ -25,7 +25,8 @@ def integrate_dd_hohlraum(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                           option_problem : str = "hohlraum", 
                           snapshots: int = 2, plot_name_add = "",
                           option_rank_adaptivity: str = "v1",
-                          grid: Grid_2x1d = None, option_error_list: int = 0):
+                          grid: Grid_2x1d = None, option_error_list: int = 0, 
+                          lr_boundary = None, grid_boundary = None):
     """
     Integrate low rank structure for hohlraum setup with domain decomposition.
 
@@ -148,6 +149,16 @@ def integrate_dd_hohlraum(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
             if t + dt > t_f:
                 dt = t_f - t
 
+            # --- Copy lr for update step ---
+            lr_on_subgrids_old = []
+
+            for row in lr_on_subgrids:
+                new_row = []
+                for lr in row:
+                    new_lr = LR(lr.U.copy(), lr.S.copy(), lr.V.copy())
+                    new_row.append(new_lr)
+                lr_on_subgrids_old.append(new_row)
+
             ### Calculate f
             f_on_subgrids = []
 
@@ -252,6 +263,39 @@ def integrate_dd_hohlraum(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                     # else:
                     source = None
 
+                    ### Set neighboring lr for each subgrid
+                    if i==0:
+                        lr_left = lr_boundary[0][j]
+                        lr_right=lr_on_subgrids_old[j][i+1]
+                        grid_left = grid_boundary[0][j]
+                        grid_right = subgrids[j][i+1]
+                    elif i==n_split_x-1:
+                        lr_left=lr_on_subgrids_old[j][i-1]
+                        lr_right = lr_boundary[1][j]
+                        grid_left = subgrids[j][i-1]
+                        grid_right = grid_boundary[1][j]
+                    else:
+                        lr_left=lr_on_subgrids_old[j][i-1]
+                        lr_right=lr_on_subgrids_old[j][i+1]
+                        grid_left = subgrids[j][i-1]
+                        grid_right = subgrids[j][i+1]
+
+                    if j==0:
+                        lr_bottom = lr_boundary[3][i]
+                        lr_top=lr_on_subgrids_old[j+1][i]
+                        grid_bottom = grid_boundary[3][i]
+                        grid_top = subgrids[j+1][i]
+                    elif j==n_split_y-1:
+                        lr_bottom=lr_on_subgrids_old[j-1][i]
+                        lr_top = lr_boundary[2][i]
+                        grid_bottom = subgrids[j-1][i]
+                        grid_top = grid_boundary[2][i]
+                    else:
+                        lr_bottom=lr_on_subgrids_old[j-1][i]
+                        lr_top=lr_on_subgrids_old[j+1][i]
+                        grid_bottom = subgrids[j-1][i]
+                        grid_top = subgrids[j+1][i]
+
                     (lr_on_subgrids[j][i], 
                      subgrids[j][i], 
                      rank_on_subgrids_adapted[j][i], 
@@ -273,7 +317,15 @@ def integrate_dd_hohlraum(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                         DX_1=D_on_subgrids[j][i][3], 
                         DY_0=D_on_subgrids[j][i][4], 
                         DY_1=D_on_subgrids[j][i][5],
-                        option_rank_adaptivity=option_rank_adaptivity
+                        option_rank_adaptivity=option_rank_adaptivity,
+                        lr_left=lr_left, 
+                        lr_right=lr_right,
+                        lr_bottom=lr_bottom,
+                        lr_top=lr_top,
+                        grid_left=grid_left,
+                        grid_right=grid_right, 
+                        grid_top=grid_top, 
+                        grid_bottom=grid_bottom
                     )
 
             ### Update time
@@ -317,7 +369,8 @@ def integrate_dd_lattice(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                          option_timescheme : str = "RK4", 
                          snapshots: int = 2, plot_name_add = "",
                          option_rank_adaptivity: str = "v1",
-                         grid: Grid_2x1d = None, option_error_list: int = 0):
+                         grid: Grid_2x1d = None, option_error_list: int = 0,
+                         lr_boundary = None):
     """
     Integrate low rank structure for lattice setup with domain decomposition.
 
@@ -428,6 +481,16 @@ def integrate_dd_lattice(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
             if t + dt > t_f:
                 dt = t_f - t
 
+            # --- Copy lr for update step ---
+            lr_on_subgrids_old = []
+
+            for row in lr_on_subgrids:
+                new_row = []
+                for lr in row:
+                    new_lr = LR(lr.U.copy(), lr.S.copy(), lr.V.copy())
+                    new_row.append(new_lr)
+                lr_on_subgrids_old.append(new_row)
+
             ### Calculate f
             f_on_subgrids = []
 
@@ -506,6 +569,70 @@ def integrate_dd_lattice(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                     else:
                         source = None
 
+                    # if 1<=i<n_split_x-1:
+                    #     lr_left=lr_on_subgrids[j][i-1]
+                    #     lr_right=lr_on_subgrids[j][i+1]
+                    # elif i==0:
+                    #     S = np.zeros((subgrids[j][i].r, subgrids[j][i].r))
+                    #     U = np.zeros((subgrids[j][i].Nx * subgrids[j][i].Ny, 
+                    #                   subgrids[j][i].r))
+                    #     V = np.zeros((subgrids[j][i].Nphi, subgrids[j][i].r))
+                    #     lr_left = LR(U, S, V)
+                    #     lr_right=lr_on_subgrids[j][i+1]
+                    # elif i==n_split_x-1:
+                    #     S = np.zeros((subgrids[j][i].r, subgrids[j][i].r))
+                    #     U = np.zeros((subgrids[j][i].Nx * subgrids[j][i].Ny, 
+                    #                   subgrids[j][i].r))
+                    #     V = np.zeros((subgrids[j][i].Nphi, subgrids[j][i].r))
+                    #     lr_left=lr_on_subgrids[j][i-1]
+                    #     lr_right = LR(U, S, V)
+
+                    # if 1<=j<n_split_y-1:
+                    #     lr_bottom=lr_on_subgrids[j-1][i]
+                    #     lr_top=lr_on_subgrids[j+1][i]
+                    # elif j==0:
+                    #     S = np.zeros((subgrids[j][i].r, subgrids[j][i].r))
+                    #     U = np.zeros((subgrids[j][i].Nx * subgrids[j][i].Ny, 
+                    #                   subgrids[j][i].r))
+                    #     V = np.zeros((subgrids[j][i].Nphi, subgrids[j][i].r))
+                    #     lr_bottom = LR(U, S, V)
+                    #     lr_top=lr_on_subgrids[j+1][i]
+                    # elif j==n_split_y-1:
+                    #     S = np.zeros((subgrids[j][i].r, subgrids[j][i].r))
+                    #     U = np.zeros((subgrids[j][i].Nx * subgrids[j][i].Ny, 
+                    #                   subgrids[j][i].r))
+
+                    #     V = np.zeros((subgrids[j][i].Nphi, subgrids[j][i].r))
+                    #     lr_bottom=lr_on_subgrids[j-1][i]
+                    #     lr_top = LR(U, S, V)
+
+                    ### Set neighboring lr for each subgrid
+                    if 1<=i<n_split_x-1:
+                        lr_left=lr_on_subgrids_old[j][i-1]
+                        lr_right=lr_on_subgrids_old[j][i+1]
+                    elif i==0:
+                        lr_left = lr_boundary
+                        lr_right=lr_on_subgrids_old[j][i+1]
+                    elif i==n_split_x-1:
+                        lr_left=lr_on_subgrids_old[j][i-1]
+                        lr_right = lr_boundary
+
+                    if 1<=j<n_split_y-1:
+                        lr_bottom=lr_on_subgrids_old[j-1][i]
+                        lr_top=lr_on_subgrids_old[j+1][i]
+                    elif j==0:
+                        lr_bottom = lr_boundary
+                        lr_top=lr_on_subgrids_old[j+1][i]
+                    elif j==n_split_y-1:
+                        lr_bottom=lr_on_subgrids_old[j-1][i]
+                        lr_top = lr_boundary
+
+                    # Grid sizes are always the same
+                    grid_left = subgrids[0][0]
+                    grid_right = subgrids[0][0]
+                    grid_top = subgrids[0][0]
+                    grid_bottom = subgrids[0][0]
+                        
                     (lr_on_subgrids[j][i], 
                      subgrids[j][i], 
                      rank_on_subgrids_adapted[j][i], 
@@ -525,7 +652,15 @@ def integrate_dd_lattice(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                         option_scheme=option_scheme, 
                         DX_0=DX_0, DX_1=DX_1, DY_0=DY_0, DY_1=DY_1,
                         option_timescheme=option_timescheme,
-                        option_rank_adaptivity=option_rank_adaptivity
+                        option_rank_adaptivity=option_rank_adaptivity,
+                        lr_left=lr_left, 
+                        lr_right=lr_right,
+                        lr_bottom=lr_bottom,
+                        lr_top=lr_top,
+                        grid_left=grid_left,
+                        grid_right=grid_right, 
+                        grid_top=grid_top, 
+                        grid_bottom=grid_bottom
                     )
 
             ### Update time
@@ -568,7 +703,8 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
               tol_lattice = 1e-5, snapshots: int = 2, plot_name_add = "",
               option_rank_adaptivity: str = "v1",
               option_data_saves: int = 0,
-              option_error_list: int = 0):
+              option_error_list: int = 0,
+              lr_left = None, lr_right = None, lr_top = None, lr_bottom = None):
     """
     Integrate low rank structure on 1 domain.
 
@@ -708,7 +844,9 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
                                    min_rank=min_rank, 
                                    rank_adapted=rank_adapted, rank_dropped=rank_dropped,
                                    tol_lattice=tol_lattice, 
-                                   option_rank_adaptivity=option_rank_adaptivity)
+                                   option_rank_adaptivity=option_rank_adaptivity,
+                                   lr_left = lr_left, lr_right = lr_right, 
+                                   lr_top = lr_top, lr_bottom = lr_bottom)
 
             t += dt
             time.append(t)

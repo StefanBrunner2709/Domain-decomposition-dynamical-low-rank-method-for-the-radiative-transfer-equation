@@ -96,6 +96,46 @@ def run_1d(option_problem = "hohlraum", option_calculate_ref = False,
     grid = Grid_2x1d(Nx, Ny, Nphi, r, _option_dd=option_grid, _coeff=[c_adv, c_s, c_t])
     lr0 = setInitialCondition_2x1d_lr(grid, option_cond="lattice")
 
+    if option_problem == "lattice":    
+        ### Setup neighboring domains (all 0 because of lattice simulation)
+        # Also for MMS we choose all 0 boundary conditions
+        grid_neigboring = Grid_2x1d(Nx, Ny, Nphi, 1, _option_dd=option_grid,
+                                    _coeff=[c_adv, c_s, c_t])
+        lr_left = setInitialCondition_2x1d_lr(grid_neigboring, 
+                                              option_cond="almost_zero")
+        lr_right = setInitialCondition_2x1d_lr(grid_neigboring, 
+                                              option_cond="almost_zero")
+        lr_top = setInitialCondition_2x1d_lr(grid_neigboring, 
+                                             option_cond="almost_zero")
+        lr_bottom = setInitialCondition_2x1d_lr(grid_neigboring, 
+                                                option_cond="almost_zero")
+
+    elif option_problem == "hohlraum":
+        ### Setup neighboring domains (left 1 because of hohlraum simulation)
+        grid_neigboring = Grid_2x1d(Nx, Ny, Nphi, 1, _option_dd=option_grid,
+                                    _coeff=[c_adv, c_s, c_t])
+        lr_left = setInitialCondition_2x1d_lr(grid_neigboring, 
+                                              option_cond="one_inflow_left")
+        lr_right = setInitialCondition_2x1d_lr(grid_neigboring, 
+                                               option_cond="almost_zero")
+        lr_top = setInitialCondition_2x1d_lr(grid_neigboring, 
+                                             option_cond="almost_zero")
+        lr_bottom = setInitialCondition_2x1d_lr(grid_neigboring, 
+                                                option_cond="almost_zero")
+
+    elif option_problem == "pointsource":
+        ### Setup neighboring domains (left gaussian because of point source simulation)
+        grid_neigboring = Grid_2x1d(Nx, Ny, Nphi, 1, _option_dd=option_grid,
+                                    _coeff=[c_adv, c_s, c_t])
+        lr_left = setInitialCondition_2x1d_lr(grid_neigboring, 
+                                            option_cond="gaussian_inflow_left")
+        lr_right = setInitialCondition_2x1d_lr(grid_neigboring, 
+                                               option_cond="almost_zero")
+        lr_top = setInitialCondition_2x1d_lr(grid_neigboring, 
+                                             option_cond="almost_zero")
+        lr_bottom = setInitialCondition_2x1d_lr(grid_neigboring, 
+                                                option_cond="almost_zero")
+
     ### Plot lattice
     extent = [grid.X[0], grid.X[-1], grid.Y[0], grid.Y[-1]]
     fig, axes = plt.subplots(1, 1, figsize=(10, 8))
@@ -189,7 +229,9 @@ def run_1d(option_problem = "hohlraum", option_calculate_ref = False,
                         plot_name_add=option_problem,
                         option_rank_adaptivity=option_rank_adaptivity,
                         option_data_saves=option_data_saves, 
-                        option_error_list=option_error_list)
+                        option_error_list=option_error_list,
+                        lr_left=lr_left, lr_right=lr_right, 
+                        lr_top=lr_top, lr_bottom=lr_bottom)
 
 
     ### Plot for rank over time

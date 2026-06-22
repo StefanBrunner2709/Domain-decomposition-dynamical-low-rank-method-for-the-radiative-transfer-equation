@@ -132,6 +132,25 @@ def setInitialCondition_2x1d_lr(grid: Grid_2x1d, option_cond: str = "standard"):
         V = V[:,:grid.r]
         S = np.diag(S[:grid.r])
 
+    elif option_cond == "almost_zero":
+        S = np.ones((grid.r, grid.r)) * 1e-9
+        U = np.random.rand(grid.Nx * grid.Ny, grid.r)
+        V = np.random.rand(grid.Nphi, grid.r)
+
+    elif option_cond == "one_inflow_left":
+        U = np.ones((grid.Nx * grid.Ny, 1)) / (grid.Nx * grid.Ny)
+        S = np.ones((1, 1)) * (grid.Nx * grid.Ny) * (grid.Nphi/2)
+        V = np.ones((grid.Nphi, 1)) / (grid.Nphi/2) 
+        V[int(grid.Nphi / 4) : int(3 * grid.Nphi / 4), :] = 0
+
+    elif option_cond == "gaussian_inflow_left":
+        values_U = (1/ (np.sqrt(2 * np.pi)*1e-2) 
+                    * np.exp(-((grid.Y - 0.85 - grid.dy/2) ** 2) / (2*(1e-2)**2)))
+        U = np.repeat(values_U, grid.Nx, axis=0).reshape(-1, 1) / (grid.Nx * grid.Ny)
+        S = np.ones((1, 1)) * (grid.Nx * grid.Ny) * (grid.Nphi/2)
+        V = np.ones((grid.Nphi, 1)) / (grid.Nphi/2) 
+        V[int(grid.Nphi / 4) : int(3 * grid.Nphi / 4), :] = 0
+
     U_ortho, R_U = np.linalg.qr(U, mode="reduced")
     U_ortho /= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
     R_U *= (np.sqrt(grid.dx) * np.sqrt(grid.dy))

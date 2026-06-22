@@ -3,6 +3,7 @@ import numpy as np
 
 from DLR_rt.src.grid import Grid_2x1d
 from DLR_rt.src.initial_condition import (
+    setInitialCondition_2x1d_lr,
     setInitialCondition_2x1d_lr_subgrids,
 )
 from DLR_rt.src.lr import LR
@@ -39,7 +40,7 @@ def run_dd_hohlraum(option_problem = "hohlraum", option_error_estimate = False,
         t_f = 1.2
         snapshots = 7
         option_error_list = 121 if option_error_estimate else 0
-        drop_tol = 1e-3
+        drop_tol = 16e-4
         option_problem_int = "hohlraum"  # For running code
     elif option_problem == "pointsource" or option_problem == "pointsource_2":
         Nx = 600
@@ -50,7 +51,7 @@ def run_dd_hohlraum(option_problem = "hohlraum", option_error_estimate = False,
         option_problem_int = "pointsource"  # For running code
 
     if option_problem == "pointsource":
-        drop_tol = 1e-4
+        drop_tol = 16e-5
     elif option_problem == "pointsource_2":
         drop_tol = 1e-5
 
@@ -69,6 +70,61 @@ def run_dd_hohlraum(option_problem = "hohlraum", option_error_estimate = False,
 
     lr0_on_subgrids = setInitialCondition_2x1d_lr_subgrids(subgrids, 
                                                            option_cond="lattice")
+    
+    ### Setup boundary neighbouring domains (left 1 because of hohlraum simulation)
+    n_split_x = subgrids[0][0].n_split_x
+    n_split_y = subgrids[0][0].n_split_y
+
+    lr_boundary_left = []
+    grid_boundary_left = []
+
+    lr_boundary_right = []
+    grid_boundary_right = []
+
+    for j in range(n_split_y):
+        grid_b_l = Grid_2x1d(subgrids[j][0].Nx, subgrids[j][0].Ny, Nphi, 
+                            1, _X = subgrids[j][0].X, _Y = subgrids[j][0].Y, 
+                            _coeff=[1.0, 1.0, 1.0])
+        lr_b_l = setInitialCondition_2x1d_lr(grid_b_l, 
+                                             option_cond="one_inflow_left")
+        grid_boundary_left.append(grid_b_l)
+        lr_boundary_left.append(lr_b_l)
+
+        grid_b_r = Grid_2x1d(subgrids[j][-1].Nx, subgrids[j][-1].Ny, Nphi,
+                            1, _X = subgrids[j][-1].X, _Y = subgrids[j][-1].Y, 
+                            _coeff=[1.0, 1.0, 1.0])
+        lr_b_r = setInitialCondition_2x1d_lr(grid_b_r, 
+                                             option_cond="almost_zero")
+        grid_boundary_right.append(grid_b_r)
+        lr_boundary_right.append(lr_b_r)
+        
+    lr_boundary_top = []
+    grid_boundary_top = []
+
+    lr_boundary_bottom = []
+    grid_boundary_bottom = []
+
+    for i in range(n_split_x):
+        grid_b_t = Grid_2x1d(subgrids[-1][i].Nx, subgrids[-1][i].Ny, Nphi,
+                            1, _X = subgrids[-1][i].X, _Y = subgrids[-1][i].Y, 
+                            _coeff=[1.0, 1.0, 1.0])
+        lr_b_t = setInitialCondition_2x1d_lr(grid_b_t, 
+                                             option_cond="almost_zero")
+        grid_boundary_top.append(grid_b_t)
+        lr_boundary_top.append(lr_b_t)
+
+        grid_b_b = Grid_2x1d(subgrids[0][i].Nx, subgrids[0][i].Ny, Nphi,
+                            1, _X = subgrids[0][i].X, _Y = subgrids[0][i].Y, 
+                            _coeff=[1.0, 1.0, 1.0])
+        lr_b_b = setInitialCondition_2x1d_lr(grid_b_b, 
+                                             option_cond="almost_zero")
+        grid_boundary_bottom.append(grid_b_b)
+        lr_boundary_bottom.append(lr_b_b)
+
+    lr_boundary = (lr_boundary_left, lr_boundary_right, 
+                   lr_boundary_top, lr_boundary_bottom)
+    grid_boundary = (grid_boundary_left, grid_boundary_right, 
+                   grid_boundary_top, grid_boundary_bottom)
 
     ### Final configuration
     (lr_on_subgrids, time, 
@@ -79,7 +135,8 @@ def run_dd_hohlraum(option_problem = "hohlraum", option_error_estimate = False,
         option_problem=option_problem_int, snapshots=snapshots,
         plot_name_add=option_problem,
         option_rank_adaptivity=option_rank_adaptivity, 
-        grid = grid, option_error_list = option_error_list
+        grid = grid, option_error_list = option_error_list,
+        lr_boundary = lr_boundary, grid_boundary = grid_boundary
         )
 
     plot_ranks_subgrids(subgrids, time, rank_on_subgrids_adapted, 

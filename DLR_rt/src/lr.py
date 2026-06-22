@@ -1677,7 +1677,9 @@ def add_basis_functions(
 
 
 def add_basis_functions_v2(
-    lr, grid, F_b, tol_int
+    lr, grid, tol_int, lr_1=None, lr_2=None, option = "left_right",
+    lr_left = None, lr_right = None, lr_top = None, lr_bottom = None,
+    grid_1 = None, grid_2 = None
 ):
     """
     Add basis functions.
@@ -1698,43 +1700,68 @@ def add_basis_functions_v2(
         Tolerance for singular values.
     """
 
-    # Perform SVD
-    U_b, sing_val, V_bT = np.linalg.svd(F_b, full_matrices=False)
-
-   # No scaling necessary because we do SVD again afterwards
-
-    V_b = V_bT.T
-    Sigma_b = np.diag(sing_val)
-
-    # Form L_h
-    L = lr.V @ lr.S.T
-    L_b = V_b @ Sigma_b.T
-    L_h = np.concatenate((L, L_b), axis=1)
-
-    # Truncate according to tol_int
-    V_L, sing_val_L, U_LT = np.linalg.svd(L_h, full_matrices=False)
+    if grid_1 is None:
+        grid_1 = grid
+    if grid_2 is None:
+        grid_2 = grid
     
-    V_L /= np.sqrt(grid.dphi)
-    sing_val_L *= np.sqrt(grid.dphi)
+    if option == "left_right":
+        # Left side
+        idx_right = np.arange(grid_1.Nx - 1, grid_1.Nx * (grid_1.Ny + 1) - 1, grid_1.Nx)
+        _, Sigma = np.linalg.qr(lr_1.U[idx_right, :] @ lr_1.S, mode="reduced")
+        Sigma *= (np.sqrt(grid_1.dy))
+        L_1 = lr_1.V @ Sigma.T
 
-    r_t = len(sing_val_L)
-    sum_drop = (sing_val_L[-1]**2)
+        #Right side
+        idx_left = np.arange(0, grid_2.Nx * grid_2.Ny, grid_2.Nx)
+        _, Sigma = np.linalg.qr(lr_2.U[idx_left, :] @ lr_2.S, mode="reduced")
+        Sigma *= (np.sqrt(grid_2.dy))
+        L_2 = lr_2.V @ Sigma.T
+
+    elif option == "top_bottom":
+        # Top side
+        _, Sigma = np.linalg.qr(lr_1.U[:grid_1.Nx, :] @ lr_1.S, mode="reduced")
+        Sigma *= (np.sqrt(grid_1.dx))
+        L_1 = lr_1.V @ Sigma.T
+
+        # Bottom side
+        _, Sigma = np.linalg.qr(lr_2.U[-grid_2.Nx:, :] @ lr_2.S, mode="reduced")
+        Sigma *= (np.sqrt(grid_2.dx))
+        L_2 = lr_2.V @ Sigma.T
+
+    # STEP 1: Set L:
+    if option == "left_right" or option == "top_bottom":
+        L = np.hstack((lr.V @ lr.S.T, L_1, L_2))
+    elif option == "1domain":
+        L = np.hstack((lr.V @ lr.S.T, 
+                       lr_left.V @ lr_left.S.T, lr_right.V @ lr_right.S.T,
+                       lr_top.V @ lr_top.S.T, lr_bottom.V @ lr_bottom.S.T))
+
+    # STEP 2: Perform SVD on L:
+    V_tilde, sing_val_tilde, _ = np.linalg.svd(L, full_matrices=False)
+    V_tilde /= np.sqrt(grid.dphi)
+    sing_val_tilde *= np.sqrt(grid.dphi)
+
+    # STEP 3: Calculate a truncated rank r_t based on tol
+    r_t = len(sing_val_tilde)
+    sum_drop = (sing_val_tilde[-1]**2)
     while sum_drop < (tol_int * np.sqrt(grid.Nx*grid.Ny*grid.Nphi*
-                                       (grid.dx*grid.dy*grid.dphi)))**2 and r_t > 0:
+                                        (grid.dx*grid.dy*grid.dphi)))**2 and r_t > 0:
         r_t -= 1
-        sum_drop += (sing_val_L[r_t-1]**2)
+        sum_drop += (sing_val_tilde[r_t-1]**2)
 
     if r_t < grid.r:
         r_t = grid.r
     if r_t > grid.Nphi:
         r_t = grid.Nphi
 
-    V_new = V_L[:, :r_t]
+    # STEP 4: Truncate V_tilde and rescale back
+    V_new = V_tilde[:, :r_t]
 
     V_new *= np.sqrt(grid.dphi) # Rescale back
     # Need to do that, because we are not using the singular values afterwards
 
-    # Extend S and U accordingly
+    # STEP 5: Extend S and U accordingly
     S_extended = np.zeros((r_t, r_t))
     S_intermediate = lr.S @ lr.V.T @ V_new
     S_extended[: grid.r, : r_t] = S_intermediate
@@ -1745,6 +1772,7 @@ def add_basis_functions_v2(
 
     lr.V = V_new
 
+    # STEP 6: Orthonormalize the new basis functions and rescale
     # Do QR decompositions
     lr.U, R_U = np.linalg.qr(lr.U, mode="reduced")
     lr.U /= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
@@ -1757,6 +1785,7 @@ def add_basis_functions_v2(
     lr.S = R_U @ lr.S @ R_V.T
 
     grid.r = r_t
+    # Do I also need to add r_int variable here as in interpol code?
 
     return lr, grid
 

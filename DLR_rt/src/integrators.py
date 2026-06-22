@@ -137,7 +137,8 @@ def PSI_lie(lr, grid, dt, F_b=None, DX=None, DY=None, dimensions="1x1d",
             option_bc="standard", F_b_X=None, F_b_Y=None,
             tol_sing_val=None, drop_tol=None, min_rank=5,
             rank_adapted=None, rank_dropped=None, tol_lattice=None,
-            option_rank_adaptivity="v1"):
+            option_rank_adaptivity="v1", 
+            lr_left = None, lr_right = None, lr_top = None, lr_bottom = None):
     """
     Projector splitting integrator with lie splitting.
 
@@ -208,7 +209,10 @@ def PSI_lie(lr, grid, dt, F_b=None, DX=None, DY=None, dimensions="1x1d",
             )
         else:
             lr, grid = add_basis_functions_v2(
-                lr, grid, F_b_X, drop_tol
+                lr, grid, tol_int=drop_tol,
+                lr_left=lr_left, lr_right=lr_right, 
+                lr_top=lr_top, lr_bottom=lr_bottom, 
+                option="1domain"
             )
     if option_bc == "lattice":
         lr, grid = rank_adaptivity_PSI(lr, grid, tol=tol_lattice, min_rank=min_rank)
@@ -400,6 +404,14 @@ def PSI_splitting_lie(
     DY_1=None,
     option_timescheme="RK4",
     option_rank_adaptivity="v1",
+    lr_left=None,
+    lr_right=None,
+    lr_bottom=None,
+    lr_top=None,
+    grid_left = None, 
+    grid_right = None, 
+    grid_top = None, 
+    grid_bottom = None,
 ):
     """
     Projector splitting integrator with equation splitting and lie splitting.
@@ -457,7 +469,9 @@ def PSI_splitting_lie(
         )
     else:
         lr, grid = add_basis_functions_v2(
-            lr, grid, F_b, drop_tol
+            lr, grid, tol_int=drop_tol, 
+            lr_1=lr_left, lr_2=lr_right, option="left_right",
+            grid_1=grid_left, grid_2=grid_right
         )
 
 
@@ -515,7 +529,9 @@ def PSI_splitting_lie(
         )
     else:
         lr, grid = add_basis_functions_v2(
-            lr, grid, F_b_top_bottom, drop_tol
+            lr, grid, tol_int=drop_tol, 
+            lr_1=lr_top, lr_2=lr_bottom, option="top_bottom",
+            grid_1=grid_top, grid_2=grid_bottom
         )
 
     if rank_adapted is not None:
