@@ -40,7 +40,7 @@ def run_dd_hohlraum(option_problem = "hohlraum", option_error_estimate = False,
         t_f = 1.2
         snapshots = 7
         option_error_list = 121 if option_error_estimate else 0
-        drop_tol = 16e-4
+        drop_tol = 12e-4
         option_problem_int = "hohlraum"  # For running code
     elif option_problem == "pointsource" or option_problem == "pointsource_2":
         Nx = 600
@@ -51,7 +51,7 @@ def run_dd_hohlraum(option_problem = "hohlraum", option_error_estimate = False,
         option_problem_int = "pointsource"  # For running code
 
     if option_problem == "pointsource":
-        drop_tol = 16e-5
+        drop_tol = 12e-5
     elif option_problem == "pointsource_2":
         drop_tol = 1e-5
 
