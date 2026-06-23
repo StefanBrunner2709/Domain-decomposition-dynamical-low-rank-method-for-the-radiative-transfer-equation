@@ -414,11 +414,11 @@ def computeK_bdry(lr, grid, F_b):
     return K_bdry_left, K_bdry_right
 
 
-def computeK_bdry_2x1d_X(lr, grid, F_b_X):
+def computeK_bdry_2x1d_X(lr, grid, lr_left, lr_right, grid_left, grid_right):
     """
     Compute X grid boundary values for K in 2x1d.
 
-    Transforms the boundary information given by F_b_X into a boundary information in K.
+    Transforms the neigboring low rank information into a boundary information in K.
 
     Parameters
     ----------
@@ -426,25 +426,31 @@ def computeK_bdry_2x1d_X(lr, grid, F_b_X):
         Low rank structure on current subdomain.
     grid
         Grid class of current subdomain.
-    F_b_X
-        Left/right boundary values, given as matrix.
+    lr_left
+        Low rank structure for left neighboring subdomain.
+    lr_right
+        Low rank structure for right neighboring subdomain.
     """
-    # --- Precompute masks for PHI direction ---
-    mask_left = (np.pi / 2 > grid.PHI) | (3 * np.pi / 2 < grid.PHI)
-    mask_right = ~mask_left  # opposite of left
+    
+    # Generate V*indicator, Note: Only works for Nx divisible by 4 even
+    V_ind_out_l = np.copy(lr.V)
+    V_ind_out_r = np.copy(lr.V)
+    V_left_ind = np.copy(lr_left.V)
+    V_right_ind = np.copy(lr_right.V)
+    V_left_ind[int(grid.Nphi / 4): int(3 * grid.Nphi / 4), :] = 0
+    V_right_ind[: int(grid.Nphi / 4), :] = 0
+    V_right_ind[int(3 * grid.Nphi / 4) :, :] = 0
+    V_ind_out_l[: int(grid.Nphi / 4), :] = 0
+    V_ind_out_l[int(3 * grid.Nphi / 4) :, :] = 0
+    V_ind_out_r[int(grid.Nphi / 4): int(3 * grid.Nphi / 4), :] = 0
 
-    # --- Fill e_mats using masks (vectorized) ---
-    e_mat_left = np.zeros((grid.Ny, grid.Nphi))
-    e_mat_right = np.zeros((grid.Ny, grid.Nphi))
+    # Compute integrals for <V, V> and <V_left, V> and <V_right, V>
+    int_V_left = (V_left_ind.T @ lr.V) * grid.dphi
+    int_V_right = (V_right_ind.T @ lr.V) * grid.dphi
+    int_V_out_l = (V_ind_out_l.T @ lr.V) * grid.dphi
+    int_V_out_r = (V_ind_out_r.T @ lr.V) * grid.dphi
 
-    e_mat_left[:, mask_left] = F_b_X[:grid.Ny, mask_left]
-    e_mat_right[:, mask_right] = F_b_X[grid.Ny:, mask_right]
-
-    int_exp_left = (
-        (e_mat_left @ lr.V) * grid.dphi
-    )  # compute integral from inflow, contains information from inflow from every K_j
-    int_exp_right = (e_mat_right @ lr.V) * grid.dphi  # now matrix of dimension Ny x r
-
+    # Compute extrapolated values for K at the boundary
     K = lr.U @ lr.S
 
     # --- Precompute indices once ---
@@ -454,39 +460,28 @@ def computeK_bdry_2x1d_X(lr, grid, F_b_X):
     idx_outflow_right_2 = idx_outflow_right_1 - 1
 
     # --- Vectorized extrapolation for extrapolated values ---
-    K_extrapol_left = 2 * K[idx_outflow_left_0] - K[idx_outflow_left_1]
-    K_extrapol_right = 2 * K[idx_outflow_right_1] - K[idx_outflow_right_2]
+    K_ex_l = 2 * K[idx_outflow_left_0] - K[idx_outflow_left_1]
+    K_ex_r = 2 * K[idx_outflow_right_1] - K[idx_outflow_right_2]
 
-    # compute V_int
-    V_indicator_left = np.copy(
-        lr.V
-    )  # generate V*indicator, Note: Only works for Nx even
-    V_indicator_left[: int(grid.Nphi / 4), :] = 0
-    V_indicator_left[int(3 * grid.Nphi / 4) :, :] = 0
-    V_indicator_right = np.copy(lr.V)
-    V_indicator_right[int(grid.Nphi / 4) : int(3 * grid.Nphi / 4), :] = 0
+    # --- Precompute indices for neigboring flow ---
+    idx_left = np.arange(grid_left.Nx - 1, grid_left.Nx * (grid_left.Ny + 1) - 1, 
+                         grid_left.Nx)
+    idx_right = np.arange(0, grid_right.Nx * grid_right.Ny, grid_right.Nx)
 
-    int_V_left = (V_indicator_left.T @ lr.V) * grid.dphi  # compute integrals over V
-    int_V_right = (V_indicator_right.T @ lr.V) * grid.dphi
-
-    sum_vector_left = (
-        K_extrapol_left @ int_V_left
-    )  # compute matrix of size Ny x r with all the sums inside
-    sum_vector_right = K_extrapol_right @ int_V_right
-
-    K_bdry_left = (
-        int_exp_left + sum_vector_left
-    )  # add all together to get boundary info (matrix with info for 1<=j<=r)
-    K_bdry_right = int_exp_right + sum_vector_right
+    # Compute boundary values for K
+    K_bdry_left = (lr_left.U[idx_left,:] @ lr_left.S @ int_V_left 
+                + K_ex_l @ int_V_out_l)
+    K_bdry_right = (lr_right.U[idx_right,:] @ lr_right.S @ int_V_right 
+                    + K_ex_r @ int_V_out_r)
 
     return K_bdry_left, K_bdry_right
 
 
-def computeK_bdry_2x1d_Y(lr, grid, F_b_Y):
+def computeK_bdry_2x1d_Y(lr, grid, lr_top, lr_bottom, grid_top, grid_bottom):
     """
     Compute Y grid boundary values for K in 2x1d.
 
-    Transforms the boundary information given by F_b_Y into a boundary information in K.
+    Transforms the neigboring low rank information into a boundary information in K.
 
     Parameters
     ----------
@@ -494,52 +489,41 @@ def computeK_bdry_2x1d_Y(lr, grid, F_b_Y):
         Low rank structure on current subdomain.
     grid
         Grid class of current subdomain.
-    F_b_Y
-        Bottom/top boundary values, given as matrix.
+    lr_top
+        Low rank structure for top neighboring subdomain.
+    lr_bottom
+        Low rank structure for bottom neighboring subdomain.
     """
-    # --- Precompute masks for PHI direction ---
-    mask_bottom = (np.pi > grid.PHI)
-    mask_top = ~mask_bottom  # opposite of bottom
+    
+    # Generate V*indicator, Note: Only works for Nx divisible by 4 even
+    V_ind_out_t = np.copy(lr.V)
+    V_ind_out_b = np.copy(lr.V)
+    V_top_ind = np.copy(lr_top.V)
+    V_bottom_ind = np.copy(lr_bottom.V)
+    V_top_ind[: int(grid.Nphi / 2), :] = 0
+    V_bottom_ind[int(grid.Nphi / 2) :, :] = 0
+    V_ind_out_t[int(grid.Nphi / 2) :, :] = 0
+    V_ind_out_b[: int(grid.Nphi / 2), :] = 0
 
-    # --- Fill e_mats using masks (vectorized) ---
-    e_mat_bottom = np.zeros((grid.Nx, grid.Nphi))
-    e_mat_top = np.zeros((grid.Nx, grid.Nphi))
+    # Compute integrals for <V, V> and <V_left, V> and <V_right, V>
+    int_V_top = (V_top_ind.T @ lr.V) * grid.dphi
+    int_V_bottom = (V_bottom_ind.T @ lr.V) * grid.dphi
+    int_V_out_t = (V_ind_out_t.T @ lr.V) * grid.dphi
+    int_V_out_b = (V_ind_out_b.T @ lr.V) * grid.dphi
 
-    e_mat_bottom[:, mask_bottom] = F_b_Y[:grid.Nx, mask_bottom]
-    e_mat_top[:, mask_top] = F_b_Y[grid.Nx:, mask_top]
-
-    int_exp_bottom = (
-        (e_mat_bottom @ lr.V) * grid.dphi
-    )  # compute integral from inflow, contains information from inflow from every K_j
-    int_exp_top = (e_mat_top @ lr.V) * grid.dphi  # now matrix of dimension Nx x r
-
+    # Compute extrapolated values for K at the boundary
     K = lr.U @ lr.S
 
     # --- Vectorized extrapolation ---
-    K_extrapol_bottom = 2 * K[:grid.Nx, :] - K[grid.Nx : 2*grid.Nx, :]
-    K_extrapol_top = (2 * K[grid.Nx*(grid.Ny-1) : grid.Nx*grid.Ny, :] - 
-                      K[grid.Nx*(grid.Ny-2) : grid.Nx*(grid.Ny-1), :])
+    K_ex_b = 2 * K[:grid.Nx, :] - K[grid.Nx : 2*grid.Nx, :]
+    K_ex_t = (2 * K[grid.Nx*(grid.Ny-1) : grid.Nx*grid.Ny, :] - 
+             K[grid.Nx*(grid.Ny-2) : grid.Nx*(grid.Ny-1), :])
 
-    # compute V_int
-    V_indicator_bottom = np.copy(
-        lr.V
-    )  # generate V*indicator, Note: Only works for Ny even
-    V_indicator_bottom[: int(grid.Nphi / 2), :] = 0
-    V_indicator_top = np.copy(lr.V)
-    V_indicator_top[int(grid.Nphi / 2) :, :] = 0
-
-    int_V_bottom = (V_indicator_bottom.T @ lr.V) * grid.dphi  # compute integrals over V
-    int_V_top = (V_indicator_top.T @ lr.V) * grid.dphi
-
-    sum_vector_bottom = (
-        K_extrapol_bottom @ int_V_bottom
-    )  # compute matrix of size Nx x r with all the sums inside
-    sum_vector_top = K_extrapol_top @ int_V_top
-
-    K_bdry_bottom = (
-        int_exp_bottom + sum_vector_bottom
-    )  # add all together to get boundary info (matrix with info for 1<=j<=r)
-    K_bdry_top = int_exp_top + sum_vector_top
+    # Compute boundary values for K
+    K_bdry_top = (lr_top.U[:grid_top.Nx,:] @ lr_top.S @ int_V_top 
+                + K_ex_t @ int_V_out_t)
+    K_bdry_bottom = (lr_bottom.U[-grid_bottom.Nx:,:] @ lr_bottom.S 
+                    @ int_V_bottom + K_ex_b @ int_V_out_b)
 
     return K_bdry_bottom, K_bdry_top
 
@@ -804,7 +788,15 @@ def computeD(
     DY=None,
     dimensions="1x1d",
     option_dd="no_dd",
-    option_coeff="constant"
+    option_coeff="constant",
+    lr_left=None,
+    lr_right=None,
+    lr_top=None,
+    lr_bottom=None,
+    grid_left=None,
+    grid_right=None,
+    grid_top=None,
+    grid_bottom=None
 ):
     """
     Compute D coeffiecient.
@@ -860,8 +852,12 @@ def computeD(
                 D1 = [D1X, D1Y]
 
         elif option_dd == "dd":
-            K_bdry_left, K_bdry_right = computeK_bdry_2x1d_X(lr, grid, F_b)
-            K_bdry_bottom, K_bdry_top = computeK_bdry_2x1d_Y(lr, grid, F_b_Y)
+            K_bdry_left, K_bdry_right = computeK_bdry_2x1d_X(lr, grid,  
+                                                             lr_left, lr_right, 
+                                                             grid_left, grid_right)
+            K_bdry_bottom, K_bdry_top = computeK_bdry_2x1d_Y(lr, grid, 
+                                                             lr_top, lr_bottom, 
+                                                             grid_top, grid_bottom)
             DXK, DYK = computedxK_2x1d(
                 lr, K_bdry_left, K_bdry_right, K_bdry_bottom, K_bdry_top, grid, DX, DY
             )
@@ -919,8 +915,14 @@ def Kstep(
     DY_0=None,
     DY_1=None,
     option_bc="standard", 
-    F_b_X=None, 
-    F_b_Y=None
+    lr_left=None,
+    lr_right=None,
+    lr_top=None,
+    lr_bottom=None,
+    grid_left=None,
+    grid_right=None,
+    grid_top=None,
+    grid_bottom=None
 ):
     """
     K step of radiative transfer equation.
@@ -1041,8 +1043,12 @@ def Kstep(
 
             if (option_bc == "lattice" or option_bc == "hohlraum" 
                 or option_bc == "pointsource"):
-                K_bdry_left, K_bdry_right = computeK_bdry_2x1d_X(lr, grid, F_b_X)
-                K_bdry_bottom, K_bdry_top = computeK_bdry_2x1d_Y(lr, grid, F_b_Y)
+                K_bdry_left, K_bdry_right = computeK_bdry_2x1d_X(lr, grid,  
+                                                             lr_left, lr_right, 
+                                                             grid_left, grid_right)
+                K_bdry_bottom, K_bdry_top = computeK_bdry_2x1d_Y(lr, grid, 
+                                                             lr_top, lr_bottom, 
+                                                             grid_top, grid_bottom)
 
             if option_bc == "standard":
 
@@ -1273,8 +1279,10 @@ def Lstep(L, D1, B1, grid, lr=None, inflow=False,
     return rhs
 
 
-def Kstep1(C1, grid, lr, F_b_X, F_b_Y, DX, DY, option_scheme="cendiff", 
-           DX_0=None, DX_1=None, DY_0=None, DY_1=None):
+def Kstep1(C1, grid, lr, DX, DY, option_scheme="cendiff", 
+           DX_0=None, DX_1=None, DY_0=None, DY_1=None,
+           lr_left=None, lr_right=None, lr_top=None, lr_bottom=None,
+           grid_left=None, grid_right=None, grid_top=None, grid_bottom=None):
     """
     K step of radiative transfer equation with equation splitting.
 
@@ -1289,10 +1297,6 @@ def Kstep1(C1, grid, lr, F_b_X, F_b_Y, DX, DY, option_scheme="cendiff",
         Grid class.
     lr
         Current low rank structure.
-    F_b_X
-        Boundary values in x for 2x1d, given as matrix.
-    F_b_Y
-        Boundary values in y for 2x1d, given as matrix.
     DX
         Centered differences matrix in x direction.
     DY
@@ -1309,8 +1313,12 @@ def Kstep1(C1, grid, lr, F_b_X, F_b_Y, DX, DY, option_scheme="cendiff",
         Upwind matrix in y direction for negative eigenvalues.
     """
 
-    K_bdry_left, K_bdry_right = computeK_bdry_2x1d_X(lr, grid, F_b_X)
-    K_bdry_bottom, K_bdry_top = computeK_bdry_2x1d_Y(lr, grid, F_b_Y)
+    K_bdry_left, K_bdry_right = computeK_bdry_2x1d_X(lr, grid,  
+                                                    lr_left, lr_right, 
+                                                    grid_left, grid_right)
+    K_bdry_bottom, K_bdry_top = computeK_bdry_2x1d_Y(lr, grid, 
+                                                    lr_top, lr_bottom, 
+                                                    grid_top, grid_bottom)
 
     if option_scheme=="cendiff":
         DXK = computedxK_2x1d(
@@ -1340,8 +1348,10 @@ def Kstep1(C1, grid, lr, F_b_X, F_b_Y, DX, DY, option_scheme="cendiff",
     return rhs
 
 
-def Kstep2(C1, grid, lr, F_b_X, F_b_Y, DX, DY, option_scheme="cendiff", 
-           DX_0=None, DX_1=None, DY_0=None, DY_1=None):
+def Kstep2(C1, grid, lr, DX, DY, option_scheme="cendiff", 
+           DX_0=None, DX_1=None, DY_0=None, DY_1=None,
+           lr_left=None, lr_right=None, lr_top=None, lr_bottom=None,
+           grid_left=None, grid_right=None, grid_top=None, grid_bottom=None):
     """
     K step of radiative transfer equation with equation splitting.
 
@@ -1356,10 +1366,6 @@ def Kstep2(C1, grid, lr, F_b_X, F_b_Y, DX, DY, option_scheme="cendiff",
         Grid class.
     lr
         Current low rank structure.
-    F_b_X
-        Boundary values in x for 2x1d, given as matrix.
-    F_b_Y
-        Boundary values in y for 2x1d, given as matrix.
     DX
         Centered differences matrix in x direction.
     DY
@@ -1376,8 +1382,12 @@ def Kstep2(C1, grid, lr, F_b_X, F_b_Y, DX, DY, option_scheme="cendiff",
         Upwind matrix in y direction for negative eigenvalues.
     """
 
-    K_bdry_left, K_bdry_right = computeK_bdry_2x1d_X(lr, grid, F_b_X)
-    K_bdry_bottom, K_bdry_top = computeK_bdry_2x1d_Y(lr, grid, F_b_Y)
+    K_bdry_left, K_bdry_right = computeK_bdry_2x1d_X(lr, grid,  
+                                                    lr_left, lr_right, 
+                                                    grid_left, grid_right)
+    K_bdry_bottom, K_bdry_top = computeK_bdry_2x1d_Y(lr, grid, 
+                                                    lr_top, lr_bottom, 
+                                                    grid_top, grid_bottom)
 
     if option_scheme=="cendiff":
         DYK = computedxK_2x1d(

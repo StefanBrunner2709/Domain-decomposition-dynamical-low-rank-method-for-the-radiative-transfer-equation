@@ -230,7 +230,9 @@ def PSI_lie(lr, grid, dt, F_b=None, DX=None, DY=None, dimensions="1x1d",
                 K, C1, C2, grid, lr, F_b, DX=DX, DY=DY, inflow=inflow, 
                 dimensions=dimensions, option_coeff=option_coeff, source=source,
                 option_scheme=option_scheme, DX_0=DX_0, DX_1=DX_1, DY_0=DY_0, DY_1=DY_1,
-                option_bc=option_bc, F_b_X=F_b_X, F_b_Y=F_b_Y
+                option_bc=option_bc, 
+                lr_left=lr_left, lr_right=lr_right, lr_top=lr_top, lr_bottom=lr_bottom,
+                grid_left=grid, grid_right=grid, grid_top=grid, grid_bottom=grid
             ),
             dt,
         )   # we use RK4 for both cendiff and upwind
@@ -241,7 +243,9 @@ def PSI_lie(lr, grid, dt, F_b=None, DX=None, DY=None, dimensions="1x1d",
                 K, C1, C2, grid, lr, F_b, DX=DX, DY=DY, inflow=inflow, 
                 dimensions=dimensions, option_coeff=option_coeff, source=source,
                 option_scheme=option_scheme, DX_0=DX_0, DX_1=DX_1, DY_0=DY_0, DY_1=DY_1,
-                option_bc=option_bc, F_b_X=F_b_X, F_b_Y=F_b_Y
+                option_bc=option_bc, 
+                lr_left=lr_left, lr_right=lr_right, lr_top=lr_top, lr_bottom=lr_bottom,
+                grid_left=grid, grid_right=grid, grid_top=grid, grid_bottom=grid
             ),
             dt,
             option = option_timescheme,
@@ -260,8 +264,12 @@ def PSI_lie(lr, grid, dt, F_b=None, DX=None, DY=None, dimensions="1x1d",
                     dimensions=dimensions, option_coeff=option_coeff)
     elif (option_bc == "lattice" or option_bc == "hohlraum" 
           or option_bc == "pointsource"):
-        D1 = computeD(lr, grid, F_b_X, F_b_Y, DX=DX, DY=DY, 
-                    dimensions=dimensions, option_dd = "dd", option_coeff=option_coeff)
+        D1 = computeD(lr, grid, DX=DX, DY=DY, 
+                    dimensions=dimensions, option_dd = "dd", option_coeff=option_coeff,
+                    lr_left=lr_left, lr_right=lr_right, 
+                    lr_top=lr_top, lr_bottom=lr_bottom,
+                    grid_left=grid, grid_right=grid, 
+                    grid_top=grid, grid_bottom=grid)
         
     if option_coeff == "constant":
         E1 = None
@@ -388,8 +396,8 @@ def PSI_splitting_lie(
     lr,
     grid,
     dt,
-    F_b,
-    F_b_top_bottom,
+    F_b=None,
+    F_b_top_bottom=None,
     DX=None,
     DY=None,
     tol_sing_val=1e-6,
@@ -482,13 +490,23 @@ def PSI_splitting_lie(
     C1, C2 = computeC(lr, grid, dimensions="2x1d")
     K = lr.U @ lr.S
     if option_timescheme == "RK4":
-        K += dt * RK4(K, lambda K: Kstep1(C1, grid, lr, F_b, F_b_top_bottom, DX, DY, 
+        K += dt * RK4(K, lambda K: Kstep1(C1, grid, lr, DX, DY, 
                                         option_scheme=option_scheme, 
-                                        DX_0=DX_0, DX_1=DX_1, DY_0=DY_0, DY_1=DY_1), dt)
+                                        DX_0=DX_0, DX_1=DX_1, DY_0=DY_0, DY_1=DY_1,
+                                        lr_left=lr_left, lr_right=lr_right, 
+                                        lr_top=lr_top, lr_bottom=lr_bottom,
+                                        grid_left=grid_left, grid_right=grid_right, 
+                                        grid_top=grid_top, grid_bottom=grid_bottom
+                                        ), dt)
     elif option_timescheme == "impl_Euler" or option_timescheme == "impl_Euler_gmres":
-        K = impl_Euler(K, lambda K: Kstep1(C1, grid, lr, F_b, F_b_top_bottom, DX, DY, 
+        K = impl_Euler(K, lambda K: Kstep1(C1, grid, lr, DX, DY, 
                                         option_scheme=option_scheme, 
-                                        DX_0=DX_0, DX_1=DX_1, DY_0=DY_0, DY_1=DY_1), dt,
+                                        DX_0=DX_0, DX_1=DX_1, DY_0=DY_0, DY_1=DY_1,
+                                        lr_left=lr_left, lr_right=lr_right, 
+                                        lr_top=lr_top, lr_bottom=lr_bottom,
+                                        grid_left=grid_left, grid_right=grid_right, 
+                                        grid_top=grid_top, grid_bottom=grid_bottom
+                                        ), dt,
                                         option = option_timescheme)
     lr.U, lr.S = np.linalg.qr(K, mode="reduced")
     lr.U /= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
@@ -496,7 +514,10 @@ def PSI_splitting_lie(
 
     # S step
     D1 = computeD(
-        lr, grid, F_b, F_b_top_bottom, DX=DX, DY=DY, dimensions="2x1d", option_dd="dd"
+        lr, grid, DX=DX, DY=DY, dimensions="2x1d", option_dd="dd", 
+        lr_left=lr_left, lr_right=lr_right, lr_top=lr_top, lr_bottom=lr_bottom, 
+        grid_left=grid_left, grid_right=grid_right, 
+        grid_top=grid_top, grid_bottom=grid_bottom
     )
     if option_timescheme == "RK4":
         lr.S += dt * RK4(lr.S, lambda S: Sstep1(C1, D1, grid), dt)
@@ -542,13 +563,23 @@ def PSI_splitting_lie(
     C1, C2 = computeC(lr, grid, dimensions="2x1d")
     K = lr.U @ lr.S
     if option_timescheme == "RK4":
-        K += dt * RK4(K, lambda K: Kstep2(C1, grid, lr, F_b, F_b_top_bottom, DX, DY, 
+        K += dt * RK4(K, lambda K: Kstep2(C1, grid, lr, DX, DY, 
                                         option_scheme=option_scheme, 
-                                        DX_0=DX_0, DX_1=DX_1, DY_0=DY_0, DY_1=DY_1), dt)
+                                        DX_0=DX_0, DX_1=DX_1, DY_0=DY_0, DY_1=DY_1,
+                                        lr_left=lr_left, lr_right=lr_right, 
+                                        lr_top=lr_top, lr_bottom=lr_bottom,
+                                        grid_left=grid_left, grid_right=grid_right, 
+                                        grid_top=grid_top, grid_bottom=grid_bottom
+                                        ), dt)
     elif option_timescheme == "impl_Euler" or option_timescheme == "impl_Euler_gmres":
-        K = impl_Euler(K, lambda K: Kstep2(C1, grid, lr, F_b, F_b_top_bottom, DX, DY, 
+        K = impl_Euler(K, lambda K: Kstep2(C1, grid, lr, DX, DY, 
                                         option_scheme=option_scheme, 
-                                        DX_0=DX_0, DX_1=DX_1, DY_0=DY_0, DY_1=DY_1), dt,
+                                        DX_0=DX_0, DX_1=DX_1, DY_0=DY_0, DY_1=DY_1,
+                                        lr_left=lr_left, lr_right=lr_right, 
+                                        lr_top=lr_top, lr_bottom=lr_bottom,
+                                        grid_left=grid_left, grid_right=grid_right, 
+                                        grid_top=grid_top, grid_bottom=grid_bottom
+                                        ), dt,
                           option = option_timescheme)
     lr.U, lr.S = np.linalg.qr(K, mode="reduced")
     lr.U /= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
@@ -556,7 +587,10 @@ def PSI_splitting_lie(
 
     # S step
     D1 = computeD(
-        lr, grid, F_b, F_b_top_bottom, DX=DX, DY=DY, dimensions="2x1d", option_dd="dd"
+        lr, grid, DX=DX, DY=DY, dimensions="2x1d", option_dd="dd", 
+        lr_left=lr_left, lr_right=lr_right, lr_top=lr_top, lr_bottom=lr_bottom, 
+        grid_left=grid_left, grid_right=grid_right, 
+        grid_top=grid_top, grid_bottom=grid_bottom
     )
     if option_timescheme == "RK4":
         lr.S += dt * RK4(lr.S, lambda S: Sstep2(C1, D1, grid), dt)

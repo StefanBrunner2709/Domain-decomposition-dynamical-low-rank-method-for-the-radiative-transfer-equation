@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from DLR_rt.src.grid import Grid_2x1d
 from DLR_rt.src.integrators import PSI_lie, PSI_splitting_lie
-from DLR_rt.src.lr import LR, computeF_b_2x1d_X, computeF_b_2x1d_Y
+from DLR_rt.src.lr import LR
 from DLR_rt.src.util import (
     computeD_cendiff_2x1d,
     computeD_upwind_2x1d,
@@ -172,86 +172,6 @@ def integrate_dd_hohlraum(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                     row.append(f)
                 f_on_subgrids.append(row)
 
-            ### Calculate F_b
-            F_b_X_on_subgrids = []
-            F_b_Y_on_subgrids = []
-            
-            for j in range(n_split_y):
-                row_F_b_X = []
-                row_F_b_Y = []
-                for i in range(n_split_x):
-
-                    if i==0:
-                        F_b_X = computeF_b_2x1d_X(f_on_subgrids[j][i],subgrids[j][i],
-                                                  f_left=f_on_subgrids[j][n_split_x-1],
-                                                  f_right=f_on_subgrids[j][i+1],
-                                                  grid_left=subgrids[j][n_split_x-1],
-                                                  grid_right=subgrids[j][i+1])     
-                        if option_problem == "hohlraum":
-                            for k in range(len(subgrids[j][i].PHI)):  # inflow left is 1
-                                if (subgrids[j][i].PHI[k] < np.pi / 2 
-                                    or subgrids[j][i].PHI[k] > 3 / 2 * np.pi):
-                                    F_b_X[: len(subgrids[j][i].Y), k] = 1
-                        elif option_problem == "pointsource":
-                            for k in range(len(subgrids[j][i].PHI)):
-                                if (subgrids[j][i].PHI[k] < np.pi / 2 
-                                    or subgrids[j][i].PHI[k] > 3 / 2 * np.pi):
-                                    F_b_X[: len(subgrids[j][i].Y), k] = 0
-                                    if j == n_split_y-2:
-                                        F_b_X[: len(subgrids[j][i].Y), k] = (
-                                            1
-                                            / (np.sqrt(2 * np.pi)*1e-2)
-                                            * np.exp(-((subgrids[j][i].Y - 0.85
-                                                        -subgrids[j][i].dy/2) ** 2) 
-                                                     / (2*(1e-2)**2))
-                                        )
-                    elif i==n_split_x-1:
-                        F_b_X = computeF_b_2x1d_X(f_on_subgrids[j][i],subgrids[j][i],
-                                                  f_left=f_on_subgrids[j][i-1],
-                                                  f_right=f_on_subgrids[j][0],
-                                                  grid_left=subgrids[j][i-1],
-                                                  grid_right=subgrids[j][0])
-                        for k in range(len(subgrids[j][i].PHI)):  # set outflow boundary
-                            if (subgrids[j][i].PHI[k] >= np.pi / 2 
-                                and subgrids[j][i].PHI[k] <= 3 / 2 * np.pi):
-                                F_b_X[len(subgrids[j][i].Y) :, k] = 0
-                    else:
-                        F_b_X = computeF_b_2x1d_X(f_on_subgrids[j][i],subgrids[j][i],
-                                                  f_left=f_on_subgrids[j][i-1],
-                                                  f_right=f_on_subgrids[j][i+1],
-                                                  grid_left=subgrids[j][i-1],
-                                                  grid_right=subgrids[j][i+1])
-                        
-                    if j==0:
-                        F_b_Y = computeF_b_2x1d_Y(f_on_subgrids[j][i],subgrids[j][i],
-                                                  f_bottom=f_on_subgrids[n_split_y-1][i],
-                                                  f_top=f_on_subgrids[j+1][i],
-                                                  grid_bottom=subgrids[n_split_y-1][i],
-                                                  grid_top=subgrids[j+1][i])
-                        for k in range(len(subgrids[j][i].PHI)):  # set outflow boundary
-                            if subgrids[j][i].PHI[k] < np.pi:
-                                F_b_Y[: len(subgrids[j][i].X), k] = 0
-                    elif j==n_split_y-1:
-                        F_b_Y = computeF_b_2x1d_Y(f_on_subgrids[j][i],subgrids[j][i],
-                                                  f_bottom=f_on_subgrids[j-1][i],
-                                                  f_top=f_on_subgrids[0][i],
-                                                  grid_bottom=subgrids[j-1][i],
-                                                  grid_top=subgrids[0][i])
-                        for k in range(len(subgrids[j][i].PHI)):  # set outflow boundary
-                            if subgrids[j][i].PHI[k] >= np.pi:
-                                F_b_Y[len(subgrids[j][i].X) :, k] = 0
-                    else:
-                        F_b_Y = computeF_b_2x1d_Y(f_on_subgrids[j][i],subgrids[j][i],
-                                                  f_bottom=f_on_subgrids[j-1][i],
-                                                  f_top=f_on_subgrids[j+1][i],
-                                                  grid_bottom=subgrids[j-1][i],
-                                                  grid_top=subgrids[j+1][i])
-                        
-                    row_F_b_X.append(F_b_X)
-                    row_F_b_Y.append(F_b_Y)
-                F_b_X_on_subgrids.append(row_F_b_X)
-                F_b_Y_on_subgrids.append(row_F_b_Y)
-
             ### Update lr by PSI with adaptive rank strategy
             ### Run PSI with adaptive rank strategy
             for j in range(n_split_y):
@@ -303,8 +223,6 @@ def integrate_dd_hohlraum(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                         lr_on_subgrids[j][i],
                         subgrids[j][i],
                         dt,
-                        F_b_X_on_subgrids[j][i],
-                        F_b_Y_on_subgrids[j][i],
                         DX=D_on_subgrids[j][i][0],
                         DY=D_on_subgrids[j][i][1],
                         tol_sing_val=tol_sing_val,
@@ -504,60 +422,6 @@ def integrate_dd_lattice(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                     row.append(f)
                 f_on_subgrids.append(row)
 
-            ### Calculate F_b
-            F_b_X_on_subgrids = []
-            F_b_Y_on_subgrids = []
-            
-            for j in range(n_split_y):
-                row_F_b_X = []
-                row_F_b_Y = []
-                for i in range(n_split_x):
-
-                    if i==0:
-                        F_b_X = computeF_b_2x1d_X(f_on_subgrids[j][i],subgrids[j][i],
-                                                  f_left=f_on_subgrids[j][n_split_x-1],
-                                                  f_right=f_on_subgrids[j][i+1])     
-                        for k in range(len(subgrids[j][i].PHI)):  # set outflow boundary
-                            if (subgrids[j][i].PHI[k] < np.pi / 2 
-                                or subgrids[j][i].PHI[k] > 3 / 2 * np.pi):
-                                F_b_X[: len(subgrids[j][i].Y), k] = 0
-                    elif i==n_split_x-1:
-                        F_b_X = computeF_b_2x1d_X(f_on_subgrids[j][i],subgrids[j][i],
-                                                  f_left=f_on_subgrids[j][i-1],
-                                                  f_right=f_on_subgrids[j][0])
-                        for k in range(len(subgrids[j][i].PHI)):  # set outflow boundary
-                            if (subgrids[j][i].PHI[k] >= np.pi / 2 
-                                and subgrids[j][i].PHI[k] <= 3 / 2 * np.pi):
-                                F_b_X[len(subgrids[j][i].Y) :, k] = 0
-                    else:
-                        F_b_X = computeF_b_2x1d_X(f_on_subgrids[j][i],subgrids[j][i],
-                                                  f_left=f_on_subgrids[j][i-1],
-                                                  f_right=f_on_subgrids[j][i+1])
-                        
-                    if j==0:
-                        F_b_Y = computeF_b_2x1d_Y(f_on_subgrids[j][i],subgrids[j][i],
-                                                  f_bottom=f_on_subgrids[n_split_y-1][i],
-                                                  f_top=f_on_subgrids[j+1][i])
-                        for k in range(len(subgrids[j][i].PHI)):  # set outflow boundary
-                            if subgrids[j][i].PHI[k] < np.pi:
-                                F_b_Y[: len(subgrids[j][i].X), k] = 0
-                    elif j==n_split_y-1:
-                        F_b_Y = computeF_b_2x1d_Y(f_on_subgrids[j][i],subgrids[j][i],
-                                                  f_bottom=f_on_subgrids[j-1][i],
-                                                  f_top=f_on_subgrids[0][i])
-                        for k in range(len(subgrids[j][i].PHI)):  # set outflow boundary
-                            if subgrids[j][i].PHI[k] >= np.pi:
-                                F_b_Y[len(subgrids[j][i].X) :, k] = 0
-                    else:
-                        F_b_Y = computeF_b_2x1d_Y(f_on_subgrids[j][i],subgrids[j][i],
-                                                  f_bottom=f_on_subgrids[j-1][i],
-                                                  f_top=f_on_subgrids[j+1][i])
-                        
-                    row_F_b_X.append(F_b_X)
-                    row_F_b_Y.append(F_b_Y)
-                F_b_X_on_subgrids.append(row_F_b_X)
-                F_b_Y_on_subgrids.append(row_F_b_Y)
-
             ### Update lr by PSI with adaptive rank strategy
             ### Run PSI with adaptive rank strategy
             for j in range(n_split_y):
@@ -640,8 +504,6 @@ def integrate_dd_lattice(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                         lr_on_subgrids[j][i],
                         subgrids[j][i],
                         dt,
-                        F_b_X_on_subgrids[j][i],
-                        F_b_Y_on_subgrids[j][i],
                         DX=DX,
                         DY=DY,
                         tol_sing_val=tol_sing_val,
@@ -820,18 +682,6 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
             if t + dt > t_f:
                 dt = t_f - t
 
-            if (option_bc == "lattice" or option_bc == "hohlraum" 
-                or option_bc == "pointsource"):
-
-                f = lr.U @ lr.S @ lr.V.T
-
-                F_b_X = computeF_b_2x1d_X(f, grid, option_bc = option_bc)
-                F_b_Y = computeF_b_2x1d_Y(f, grid, option_bc = option_bc)
-
-            else:
-                F_b_X = None
-                F_b_Y = None
-
             if option == "lie":
                 (lr, grid, 
                  rank_adapted, rank_dropped) = PSI_lie(lr, grid, dt, DX=DX, DY=DY, 
@@ -839,7 +689,7 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
                                    source=source, option_scheme=option_scheme,
                                    DX_0=DX_0, DX_1=DX_1, DY_0=DY_0, DY_1=DY_1,
                                    option_timescheme=option_timescheme,
-                                   option_bc = option_bc, F_b_X = F_b_X, F_b_Y = F_b_Y,
+                                   option_bc = option_bc,
                                    tol_sing_val=tol_sing_val, drop_tol=drop_tol, 
                                    min_rank=min_rank, 
                                    rank_adapted=rank_adapted, rank_dropped=rank_dropped,
