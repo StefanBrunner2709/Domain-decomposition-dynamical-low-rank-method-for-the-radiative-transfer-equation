@@ -64,7 +64,7 @@ def run_dd_lattice(option_error_estimate = False, option_dof_plot = False):
     n_split_x = 7
     grid_boundary_neigboring = Grid_2x1d(int(Nx/n_split_x), int(Ny/n_split_y), Nphi, 
                             1, _X = subgrids[0][0].X, _Y = subgrids[0][0].Y, 
-                            _coeff=[1.0, 1.0, 1.0])
+                            _coeff=[1.0, 1.0, 1.0], _option_dd="dd")
     lr_boundary = setInitialCondition_2x1d_lr(grid_boundary_neigboring, 
                                               option_cond="zero")
 

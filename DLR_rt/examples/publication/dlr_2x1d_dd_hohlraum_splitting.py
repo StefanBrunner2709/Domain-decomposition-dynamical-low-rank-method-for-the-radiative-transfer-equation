@@ -84,15 +84,23 @@ def run_dd_hohlraum(option_problem = "hohlraum", option_error_estimate = False,
     for j in range(n_split_y):
         grid_b_l = Grid_2x1d(subgrids[j][0].Nx, subgrids[j][0].Ny, Nphi, 
                             1, _X = subgrids[j][0].X, _Y = subgrids[j][0].Y, 
-                            _coeff=[1.0, 1.0, 1.0])
-        lr_b_l = setInitialCondition_2x1d_lr(grid_b_l, 
-                                             option_cond="one_inflow_left")
+                            _coeff=[1.0, 1.0, 1.0], _option_dd="dd")
+        if option_problem == "hohlraum":
+            lr_b_l = setInitialCondition_2x1d_lr(grid_b_l, 
+                                                option_cond="one_inflow_left")
+        elif option_problem == "pointsource" or option_problem == "pointsource_2":
+            if j == 3:
+                lr_b_l = setInitialCondition_2x1d_lr(grid_b_l, 
+                                                    option_cond="gaussian_inflow_left_dd")
+            else:
+                lr_b_l = setInitialCondition_2x1d_lr(grid_b_l, 
+                                                    option_cond="zero")
         grid_boundary_left.append(grid_b_l)
         lr_boundary_left.append(lr_b_l)
 
         grid_b_r = Grid_2x1d(subgrids[j][-1].Nx, subgrids[j][-1].Ny, Nphi,
                             1, _X = subgrids[j][-1].X, _Y = subgrids[j][-1].Y, 
-                            _coeff=[1.0, 1.0, 1.0])
+                            _coeff=[1.0, 1.0, 1.0], _option_dd="dd")
         lr_b_r = setInitialCondition_2x1d_lr(grid_b_r, 
                                              option_cond="zero")
         grid_boundary_right.append(grid_b_r)
@@ -107,7 +115,7 @@ def run_dd_hohlraum(option_problem = "hohlraum", option_error_estimate = False,
     for i in range(n_split_x):
         grid_b_t = Grid_2x1d(subgrids[-1][i].Nx, subgrids[-1][i].Ny, Nphi,
                             1, _X = subgrids[-1][i].X, _Y = subgrids[-1][i].Y, 
-                            _coeff=[1.0, 1.0, 1.0])
+                            _coeff=[1.0, 1.0, 1.0], _option_dd="dd")
         lr_b_t = setInitialCondition_2x1d_lr(grid_b_t, 
                                              option_cond="zero")
         grid_boundary_top.append(grid_b_t)
@@ -115,7 +123,7 @@ def run_dd_hohlraum(option_problem = "hohlraum", option_error_estimate = False,
 
         grid_b_b = Grid_2x1d(subgrids[0][i].Nx, subgrids[0][i].Ny, Nphi,
                             1, _X = subgrids[0][i].X, _Y = subgrids[0][i].Y, 
-                            _coeff=[1.0, 1.0, 1.0])
+                            _coeff=[1.0, 1.0, 1.0], _option_dd="dd")
         lr_b_b = setInitialCondition_2x1d_lr(grid_b_b, 
                                              option_cond="zero")
         grid_boundary_bottom.append(grid_b_b)

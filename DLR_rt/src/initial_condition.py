@@ -151,6 +151,16 @@ def setInitialCondition_2x1d_lr(grid: Grid_2x1d, option_cond: str = "standard"):
         V = np.ones((grid.Nphi, 1)) / (grid.Nphi/2) 
         V[int(grid.Nphi / 4) : int(3 * grid.Nphi / 4), :] = 0
 
+    elif option_cond == "gaussian_inflow_left_dd":
+        values_U = (1/ (np.sqrt(2 * np.pi)*1e-2) 
+                    * np.exp(-((grid.Y - 0.85 - grid.dy/2) ** 2) / (2*(1e-2)**2)))
+        total_Nx = int(1/grid.dx)
+        total_Ny = int(1/grid.dy)
+        U = np.repeat(values_U, grid.Nx, axis=0).reshape(-1, 1) / (total_Nx * total_Ny)
+        S = np.ones((1, 1)) * (total_Nx * total_Ny) * (grid.Nphi/2)
+        V = np.ones((grid.Nphi, 1)) / (grid.Nphi/2) 
+        V[int(grid.Nphi / 4) : int(3 * grid.Nphi / 4), :] = 0
+
     U_ortho, R_U = np.linalg.qr(U, mode="reduced")
     U_ortho /= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
     R_U *= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
