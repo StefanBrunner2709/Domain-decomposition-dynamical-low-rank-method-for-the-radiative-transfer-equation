@@ -612,7 +612,8 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
     """
     min_rank = grid.r
 
-    if option_bc == "lattice" or option_bc == "hohlraum" or option_bc == "pointsource":
+    if (option_bc == "lattice" or option_bc == "hohlraum" 
+        or option_bc == "pointsource" or option_bc == "linesource"):
         rank_adapted = [grid.r]
         rank_dropped = [grid.r]
     else:

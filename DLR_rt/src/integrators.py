@@ -214,10 +214,10 @@ def PSI_lie(lr, grid, dt, F_b=None, DX=None, DY=None, dimensions="1x1d",
                 lr_top=lr_top, lr_bottom=lr_bottom, 
                 option="1domain"
             )
-    if option_bc == "lattice":
+    if option_bc == "lattice" or option_bc == "linesource":
         lr, grid = rank_adaptivity_PSI(lr, grid, tol=tol_lattice, min_rank=min_rank)
     if (option_bc == "lattice" or option_bc == "hohlraum" 
-        or option_bc == "pointsource"):
+        or option_bc == "pointsource" or option_bc == "linesource"):
         rank_adapted.append(grid.r)
 
     # K step
@@ -263,7 +263,7 @@ def PSI_lie(lr, grid, dt, F_b=None, DX=None, DY=None, dimensions="1x1d",
         D1 = computeD(lr, grid, F_b, DX=DX, DY=DY, 
                     dimensions=dimensions, option_coeff=option_coeff)
     elif (option_bc == "lattice" or option_bc == "hohlraum" 
-          or option_bc == "pointsource"):
+          or option_bc == "pointsource" or option_bc == "linesource"):
         D1 = computeD(lr, grid, DX=DX, DY=DY, 
                     dimensions=dimensions, option_dd = "dd", option_coeff=option_coeff,
                     lr_left=lr_left, lr_right=lr_right, 
@@ -324,7 +324,8 @@ def PSI_lie(lr, grid, dt, F_b=None, DX=None, DY=None, dimensions="1x1d",
     if option_bc == "hohlraum" or option_bc == "pointsource":
         lr, grid = drop_basis_functions(lr, grid, drop_tol, min_rank=min_rank, 
                                         dimensions="2x1d")
-    if option_bc == "lattice" or option_bc == "hohlraum" or option_bc == "pointsource":
+    if (option_bc == "lattice" or option_bc == "hohlraum" 
+        or option_bc == "pointsource" or option_bc == "linesource"):
         rank_dropped.append(grid.r)
 
     return lr, grid, rank_adapted, rank_dropped

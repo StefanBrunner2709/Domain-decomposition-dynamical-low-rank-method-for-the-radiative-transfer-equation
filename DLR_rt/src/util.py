@@ -769,6 +769,22 @@ def setup_coeff_source_1domain(Nx, Ny, option_bc):
         c_s = diags(c_s_vec)
         c_t = diags(c_t_vec)
 
+    elif option_bc == "linesource":
+        ### Line source setup
+        c_adv_vec = np.ones(Nx*Ny)
+        c_adv = diags(c_adv_vec)
+
+        c_s_matrix = np.ones((Nx,Ny))
+        c_t_matrix = np.ones((Nx,Ny))
+
+        # Change to vector
+        c_s_vec = c_s_matrix.flatten()
+        c_t_vec = c_t_matrix.flatten()
+
+        # Change to diag matrix
+        c_s = diags(c_s_vec)
+        c_t = diags(c_t_vec)
+
     if option_bc == "lattice":
         ### Do normal 1 source
         # Start with all zeros
@@ -782,7 +798,8 @@ def setup_coeff_source_1domain(Nx, Ny, option_bc):
         # Expand to full matrix
         source = np.kron(block_matrix, np.ones((block_size, block_size)))
 
-    elif option_bc == "hohlraum" or option_bc == "pointsource":
+    elif (option_bc == "hohlraum" or option_bc == "pointsource"
+          or option_bc == "linesource"):
         ### Hohlraum and pointsource already have inflow source
         source = np.zeros((Nx,Ny))
 

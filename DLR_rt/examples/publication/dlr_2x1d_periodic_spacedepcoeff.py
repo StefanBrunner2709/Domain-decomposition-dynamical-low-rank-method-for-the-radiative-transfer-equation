@@ -40,8 +40,8 @@ def run_1d(option_problem = "hohlraum", option_calculate_ref = False,
             tol_lattice = 1e-10
             snapshots = 0
         else:
-            drop_tol = 6e-5
-            tol_lattice = 6e-5
+            drop_tol = 55e-6
+            tol_lattice = 55e-6
             snapshots = 8
         option_data_saves = 71 if option_calculate_ref else 0
         option_error_list = 71 if option_error_estimate else 0
@@ -55,7 +55,7 @@ def run_1d(option_problem = "hohlraum", option_calculate_ref = False,
             tol_lattice = 1e-10
             snapshots = 0
         else:
-            drop_tol = 12e-5
+            drop_tol = 13e-5
             tol_lattice = 3e-5
             snapshots = 7
         option_data_saves = 121 if option_calculate_ref else 0
@@ -73,6 +73,21 @@ def run_1d(option_problem = "hohlraum", option_calculate_ref = False,
             drop_tol = 12e-6
             tol_lattice = 3e-5
             snapshots = 11
+        option_data_saves = 101 if option_calculate_ref else 0
+        option_error_list = 101 if option_error_estimate else 0
+    elif option_problem == "linesource":
+        Nx = 400
+        Ny = 400
+        Nphi = 200
+        t_f = 0.5
+        if option_calculate_ref:
+            drop_tol = 1e-10
+            tol_lattice = 1e-10
+            snapshots = 0
+        else:
+            drop_tol = 1e-5
+            tol_lattice = 1e-5
+            snapshots = 6
         option_data_saves = 101 if option_calculate_ref else 0
         option_error_list = 101 if option_error_estimate else 0
 
@@ -94,9 +109,12 @@ def run_1d(option_problem = "hohlraum", option_calculate_ref = False,
 
     ### Setup grid and initial condition
     grid = Grid_2x1d(Nx, Ny, Nphi, r, _option_dd=option_grid, _coeff=[c_adv, c_s, c_t])
-    lr0 = setInitialCondition_2x1d_lr(grid, option_cond="lattice")
+    if option_problem == "linesource":
+        lr0 = setInitialCondition_2x1d_lr(grid, option_cond="linesource")
+    else:
+        lr0 = setInitialCondition_2x1d_lr(grid, option_cond="lattice")
 
-    if option_problem == "lattice":    
+    if option_problem == "lattice" or option_problem == "linesource":    
         ### Setup neighboring domains (all 0 because of lattice simulation)
         # Also for MMS we choose all 0 boundary conditions
         grid_neigboring = Grid_2x1d(Nx, Ny, Nphi, 1, _option_dd=option_grid,
@@ -137,53 +155,56 @@ def run_1d(option_problem = "hohlraum", option_calculate_ref = False,
                                                 option_cond="zero")
 
     ### Plot lattice
-    extent = [grid.X[0], grid.X[-1], grid.Y[0], grid.Y[-1]]
-    fig, axes = plt.subplots(1, 1, figsize=(10, 8))
+    if (option_problem == "lattice" or option_problem == "hohlraum" 
+        or option_problem == "pointsource"):   
 
-    axes.imshow(c_t_matrix, extent=extent, origin="lower", cmap="jet", 
-                    interpolation="none")
-    axes.set_xlabel("$x$", fontsize=fs)
-    axes.set_ylabel("$y$", fontsize=fs)
-    axes.set_xticks([0, 0.5, 1])
-    axes.set_yticks([0, 0.5, 1])
-    axes.tick_params(axis="both", labelsize=fs, pad=10)
+        extent = [grid.X[0], grid.X[-1], grid.Y[0], grid.Y[-1]]
+        fig, axes = plt.subplots(1, 1, figsize=(10, 8))
 
-    cmap = matplotlib.colormaps.get_cmap('jet')
+        axes.imshow(c_t_matrix, extent=extent, origin="lower", cmap="jet", 
+                        interpolation="none")
+        axes.set_xlabel("$x$", fontsize=fs)
+        axes.set_ylabel("$y$", fontsize=fs)
+        axes.set_xticks([0, 0.5, 1])
+        axes.set_yticks([0, 0.5, 1])
+        axes.tick_params(axis="both", labelsize=fs, pad=10)
 
-    if option_problem == "lattice":
-        x_edges = np.linspace(extent[0], extent[1], 8)
-        y_edges = np.linspace(extent[2], extent[3], 8)
-        blue_patch = mpatches.Patch(color=cmap(0.0), label=r'$c_{\text{s}}=1$'  
-                                    + '\n' +  r'$c_{\text{t}}=1$')
-        red_patch = mpatches.Patch(color=cmap(1.0), label=r'$c_{\text{s}}=0$'  
-                                + '\n' +  r'$c_{\text{t}}=10$')
+        cmap = matplotlib.colormaps.get_cmap('jet')
 
-    else:
-        x_edges = [0, 0.05, 0.25, 0.75, 0.95, 1]
-        y_edges = [0, 0.05, 0.25, 0.75, 0.95, 1]
-        blue_patch = mpatches.Patch(color=cmap(0.0), label=r'$c_{\text{s}}=0$'  
-                                    + '\n' +  r'$c_{\text{t}}=0$')
-        red_patch = mpatches.Patch(color=cmap(1.0), label=r'$c_{\text{s}}=0$'  
-                                + '\n' +  r'$c_{\text{t}}=100$')
+        if option_problem == "lattice":
+            x_edges = np.linspace(extent[0], extent[1], 8)
+            y_edges = np.linspace(extent[2], extent[3], 8)
+            blue_patch = mpatches.Patch(color=cmap(0.0), label=r'$c_{\text{s}}=1$'  
+                                        + '\n' +  r'$c_{\text{t}}=1$')
+            red_patch = mpatches.Patch(color=cmap(1.0), label=r'$c_{\text{s}}=0$'  
+                                    + '\n' +  r'$c_{\text{t}}=10$')
 
-    for x in x_edges:
-        axes.axvline(x=x, color='white', linewidth=0.5)
-    for y in y_edges:
-        axes.axhline(y=y, color='white', linewidth=0.5)
+        else:
+            x_edges = [0, 0.05, 0.25, 0.75, 0.95, 1]
+            y_edges = [0, 0.05, 0.25, 0.75, 0.95, 1]
+            blue_patch = mpatches.Patch(color=cmap(0.0), label=r'$c_{\text{s}}=0$'  
+                                        + '\n' +  r'$c_{\text{t}}=0$')
+            red_patch = mpatches.Patch(color=cmap(1.0), label=r'$c_{\text{s}}=0$'  
+                                    + '\n' +  r'$c_{\text{t}}=100$')
 
-    axes.set_axisbelow(False)
+        for x in x_edges:
+            axes.axvline(x=x, color='white', linewidth=0.5)
+        for y in y_edges:
+            axes.axhline(y=y, color='white', linewidth=0.5)
 
-    axes.legend(
-        handles=[blue_patch, red_patch],
-        loc='upper left',           # anchor legend to the left side of the bbox
-        bbox_to_anchor=(1.05, 1.0),  # (x, y) — place it just outside the axes
-        fontsize=fs,
-        labelspacing=1.0,
-    )
+        axes.set_axisbelow(False)
 
-    plt.tight_layout()
-    plt.savefig(savepath + "setup_" + option_problem + ".pdf", bbox_inches="tight")
-    plt.close()
+        axes.legend(
+            handles=[blue_patch, red_patch],
+            loc='upper left',           # anchor legend to the left side of the bbox
+            bbox_to_anchor=(1.05, 1.0),  # (x, y) — place it just outside the axes
+            fontsize=fs,
+            labelspacing=1.0,
+        )
+
+        plt.tight_layout()
+        plt.savefig(savepath + "setup_" + option_problem + ".pdf", bbox_inches="tight")
+        plt.close()
 
     ### Plot source
     extent = [grid.X[0], grid.X[-1], grid.Y[0], grid.Y[-1]]

@@ -1042,7 +1042,7 @@ def Kstep(
             T1_1 = np.diag(eigvals_1)
 
             if (option_bc == "lattice" or option_bc == "hohlraum" 
-                or option_bc == "pointsource"):
+                or option_bc == "pointsource" or option_bc == "linesource"):
                 K_bdry_left, K_bdry_right = computeK_bdry_2x1d_X(lr, grid,  
                                                              lr_left, lr_right, 
                                                              grid_left, grid_right)
@@ -1079,7 +1079,7 @@ def Kstep(
                         DYK[:,i] = DYK_1[:,i]
 
             elif (option_bc == "lattice" or option_bc == "hohlraum" 
-                  or option_bc == "pointsource"):
+                  or option_bc == "pointsource" or option_bc == "linesource"):
                 
                 DXK, DYK = computedxK_2x1d_upwind(
                     lr, K_bdry_left, K_bdry_right, K_bdry_bottom, K_bdry_top, grid, 
@@ -1181,7 +1181,7 @@ def Sstep(S, C1, C2, D1, grid, inflow=False,
                 )
             
             elif (option_bc == "lattice" or option_bc == "hohlraum" 
-                  or option_bc == "pointsource"):
+                  or option_bc == "pointsource" or option_bc == "linesource"):
 
                 rhs = (
                     D1[0] @ C1[0]
@@ -1266,7 +1266,7 @@ def Lstep(L, D1, B1, grid, lr=None, inflow=False,
                 )
 
             elif (option_bc == "lattice" or option_bc == "hohlraum" 
-                  or option_bc == "pointsource"):
+                  or option_bc == "pointsource" or option_bc == "linesource"):
 
                 rhs = (
                     -np.diag(np.cos(grid.PHI)) @ lr.V @ D1[0].T

@@ -161,6 +161,17 @@ def setInitialCondition_2x1d_lr(grid: Grid_2x1d, option_cond: str = "standard"):
         V = np.ones((grid.Nphi, 1)) / (grid.Nphi/2) 
         V[int(grid.Nphi / 4) : int(3 * grid.Nphi / 4), :] = 0
 
+    elif option_cond == "linesource":
+        for i in range(grid.Ny):
+            U[i * grid.Nx : (i + 1) * grid.Nx, 0] = (
+                1
+                / (2 * np.pi * 0.03**2)
+                * np.exp(-np.sqrt((grid.X - 0.5) ** 2 + (grid.Y[i] - 0.5) ** 2) 
+                         / (2 * 0.03**2))
+            )
+        V[:,0] = 1.0 / grid.Nphi
+        S[0, 0] = 1.0
+
     U_ortho, R_U = np.linalg.qr(U, mode="reduced")
     U_ortho /= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
     R_U *= (np.sqrt(grid.dx) * np.sqrt(grid.dy))
