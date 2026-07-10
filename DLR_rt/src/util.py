@@ -443,7 +443,7 @@ def plot_ranks_subgrids(subgrids, time,
         for i in range(n_split_x):
             data[i,n_split_y-j-1] = rank_on_subgrids_adapted[j][i][-1]
 
-    if option == "lattice":
+    if option == "lattice" or option == "linesource":
         # Create the plot
         fig, ax = plt.subplots()
         ax.imshow(data.T, cmap='viridis')  # You can change colormap
@@ -507,7 +507,7 @@ def plot_ranks_subgrids(subgrids, time,
         for i in range(n_split_x):
             data[i,n_split_y-j-1] = rank_on_subgrids_dropped[j][i][-1]
 
-    if option == "lattice":
+    if option == "lattice" or option == "linesource":
         # Create the plot
         fig, ax = plt.subplots()
         ax.imshow(data.T, cmap='viridis')  # You can change colormap

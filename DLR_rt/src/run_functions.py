@@ -714,3 +714,228 @@ def integrate_1domain(lr0: LR, grid: Grid_2x1d, t_f: float, dt: float,
                 next_error_list_idx += 1
 
     return lr, time, rank_adapted, rank_dropped, Frob_list
+
+def integrate_dd_linesource(lr0_on_subgrids: LR, subgrids: Grid_2x1d, 
+                         t_f: float, dt: float,
+                         tol_sing_val: float = 1e-3, drop_tol: float = 1e-7,
+                         option_scheme: str = "cendiff", 
+                         option_timescheme : str = "RK4", 
+                         snapshots: int = 2, plot_name_add = "",
+                         option_rank_adaptivity: str = "v1",
+                         grid: Grid_2x1d = None, option_error_list: int = 0,
+                         lr_boundary = None):
+    """
+    Integrate low rank structure for linesource setup with domain decomposition.
+
+    Can be used for linesource simulations. Integrations is done according to evolution 
+    equations obtained after splitting the radiative transfer equation.
+
+    Parameters
+    ----------
+    lr0_on_subgrids
+        Low rank structures on subdomains at initial time.
+    subgrids
+        Grid classes on subdomains.
+    t_f
+        Final time.
+    dt
+        Time step size.
+    tol_sing_val
+        Tolerance for add basis function step.
+    drop_tol
+        Tolerance for drop basis function step.
+    option_scheme
+        Can be chosen "cendiff" or "upwind".
+    option_timescheme
+        Can be chosen "RK4", "impl_Euler" or "impl_Euler_gmres".
+    snapshots
+        Number of snapshots to be taken (including initial and final time).
+    plot_name_add
+        Additional string to add to plot names.
+    option_rank_adaptivity
+        Possible options are "v1" or "v2".
+    grid
+        Full grid class for error computation.
+    option_error_list
+        If > 0, compute error to reference solution.
+    """
+    
+    lr_on_subgrids = lr0_on_subgrids
+    t = 0
+    time = []
+    time.append(t)
+
+    DX, DY = computeD_cendiff_2x1d(subgrids[0][0], "dd")
+    # all grids have same size, thus enough to compute once
+
+    if option_scheme == "upwind":
+        DX_0, DX_1, DY_0, DY_1 = computeD_upwind_2x1d(subgrids[0][0], "dd")
+    else:
+        DX_0 = None
+        DX_1 = None
+        DY_0 = None
+        DY_1 = None
+
+    n_split_x = subgrids[0][0].n_split_x
+    n_split_y = subgrids[0][0].n_split_y
+
+    rank_on_subgrids_adapted = []
+    rank_on_subgrids_dropped = []
+
+    for j in range(n_split_y):
+        row_adapted = []
+        row_dropped = []
+        for i in range(n_split_x):
+
+            rank_adapted = [subgrids[j][i].r]
+            rank_dropped = [subgrids[j][i].r]
+
+            row_adapted.append(rank_adapted)
+            row_dropped.append(rank_dropped)
+        rank_on_subgrids_adapted.append(row_adapted)
+        rank_on_subgrids_dropped.append(row_dropped)
+
+    # --- SNAPSHOT setup ---
+    if snapshots < 2:
+        snapshots = 2  # At least initial and final
+    snapshot_times = [i * t_f / (snapshots - 1) for i in range(snapshots)]
+    next_snapshot_idx = 1  # first snapshot after t=0
+
+    # --- Initial snapshot ---
+    print(f"📸 Snapshot 1/{snapshots} at t = {t:.4f}")
+    plot_rho_subgrids(subgrids, lr_on_subgrids, t=t, plot_option="log", 
+                      plot_name_add=plot_name_add)
+    
+    # --- Compare to reference solution ---
+    Frob_list = []
+
+    if option_error_list > 0:
+        error_list_times = [i * t_f /
+                             (option_error_list - 1) for i in range(option_error_list)]
+        next_error_list_idx = 1
+
+        # Copy data from already existing file
+        data = np.load(f"data/reference_sol_linesource_t{t:.4f}.npz")
+        lr_2 = LR(data["U"], data["S"], data["V"])
+
+        f_2 = lr_2.U @ lr_2.S @ lr_2.V.T
+
+        f = generate_full_f(lr_on_subgrids, subgrids, grid)
+
+        Frob = np.linalg.norm(f - f_2, ord='fro')
+        Frob /= np.sqrt(grid.Nx * grid.Ny * grid.Nphi)
+
+        Frob_list.append(Frob)
+        
+    with tqdm(total=t_f / dt, desc="Running Simulation") as pbar:
+        while t < t_f:
+            pbar.update(1)
+
+            if t + dt > t_f:
+                dt = t_f - t
+
+            # --- Copy lr for update step ---
+            lr_on_subgrids_old = []
+
+            for row in lr_on_subgrids:
+                new_row = []
+                for lr in row:
+                    new_lr = LR(lr.U.copy(), lr.S.copy(), lr.V.copy())
+                    new_row.append(new_lr)
+                lr_on_subgrids_old.append(new_row)
+
+            ### Update lr by PSI with adaptive rank strategy
+            ### Run PSI with adaptive rank strategy
+            for j in range(n_split_y):
+                for i in range(n_split_x):
+
+                    source = None
+
+                    ### Set neighboring lr for each subgrid
+                    if 1<=i<n_split_x-1:
+                        lr_left=lr_on_subgrids_old[j][i-1]
+                        lr_right=lr_on_subgrids_old[j][i+1]
+                    elif i==0:
+                        lr_left = lr_boundary
+                        lr_right=lr_on_subgrids_old[j][i+1]
+                    elif i==n_split_x-1:
+                        lr_left=lr_on_subgrids_old[j][i-1]
+                        lr_right = lr_boundary
+
+                    if 1<=j<n_split_y-1:
+                        lr_bottom=lr_on_subgrids_old[j-1][i]
+                        lr_top=lr_on_subgrids_old[j+1][i]
+                    elif j==0:
+                        lr_bottom = lr_boundary
+                        lr_top=lr_on_subgrids_old[j+1][i]
+                    elif j==n_split_y-1:
+                        lr_bottom=lr_on_subgrids_old[j-1][i]
+                        lr_top = lr_boundary
+
+                    # Grid sizes are always the same
+                    grid_left = subgrids[0][0]
+                    grid_right = subgrids[0][0]
+                    grid_top = subgrids[0][0]
+                    grid_bottom = subgrids[0][0]
+                        
+                    (lr_on_subgrids[j][i], 
+                     subgrids[j][i], 
+                     rank_on_subgrids_adapted[j][i], 
+                     rank_on_subgrids_dropped[j][i]) = PSI_splitting_lie(
+                        lr_on_subgrids[j][i],
+                        subgrids[j][i],
+                        dt,
+                        DX=DX,
+                        DY=DY,
+                        tol_sing_val=tol_sing_val,
+                        drop_tol=drop_tol,
+                        rank_adapted=rank_on_subgrids_adapted[j][i],
+                        rank_dropped=rank_on_subgrids_dropped[j][i],
+                        source=source,
+                        option_scheme=option_scheme, 
+                        DX_0=DX_0, DX_1=DX_1, DY_0=DY_0, DY_1=DY_1,
+                        option_timescheme=option_timescheme,
+                        option_rank_adaptivity=option_rank_adaptivity,
+                        lr_left=lr_left, 
+                        lr_right=lr_right,
+                        lr_bottom=lr_bottom,
+                        lr_top=lr_top,
+                        grid_left=grid_left,
+                        grid_right=grid_right, 
+                        grid_top=grid_top, 
+                        grid_bottom=grid_bottom
+                    )
+
+            ### Update time
+            t += dt
+            time.append(t)
+
+            # --- Check for snapshot condition ---
+            if next_snapshot_idx < snapshots and t >= snapshot_times[next_snapshot_idx]:
+                print(f"📸 Snapshot {next_snapshot_idx+1}/{snapshots} at t = {t:.4f}")
+                plot_rho_subgrids(subgrids, lr_on_subgrids, t=t, plot_option="log", 
+                                  plot_name_add=plot_name_add)
+                next_snapshot_idx += 1
+
+            # --- Check for error computation condition ---
+            if (option_error_list > 0 and next_error_list_idx < option_error_list 
+                and t >= error_list_times[next_error_list_idx]):
+                
+                # Copy data from already existing file
+                data = np.load(f"data/reference_sol_linesource_t{t:.4f}.npz")
+                lr_2 = LR(data["U"], data["S"], data["V"])
+
+                f_2 = lr_2.U @ lr_2.S @ lr_2.V.T
+
+                f = generate_full_f(lr_on_subgrids, subgrids, grid)
+
+                Frob = np.linalg.norm(f - f_2, ord='fro')
+                Frob /= np.sqrt(grid.Nx * grid.Ny * grid.Nphi)
+
+                Frob_list.append(Frob)
+
+                next_error_list_idx += 1
+
+    return (lr_on_subgrids, time, 
+            rank_on_subgrids_adapted, rank_on_subgrids_dropped, Frob_list)
+

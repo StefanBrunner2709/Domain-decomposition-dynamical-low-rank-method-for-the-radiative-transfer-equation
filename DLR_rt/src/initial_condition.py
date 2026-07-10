@@ -232,6 +232,18 @@ def setInitialCondition_2x1d_lr_subgrids(subgrids, option_cond: str = "standard"
                 V[:,0] = 1.0 / subgrids[j][i].Nphi
                 S[0,0] = 1.0
 
+            elif option_cond == "linesource":
+                for k in range(subgrids[j][i].Ny):
+                    U[k * subgrids[j][i].Nx : (k + 1) * subgrids[j][i].Nx, 0] = (
+                        1
+                        / (2 * np.pi * 0.01**2)
+                        * np.exp(-np.sqrt((subgrids[j][i].X - 0.5) ** 2 
+                                          + (subgrids[j][i].Y[k] - 0.5) ** 2) 
+                                / (2 * 0.03**2))
+                    )
+                V[:,0] = 1.0 / subgrids[j][i].Nphi
+                S[0, 0] = 1.0
+
             U_ortho, R_U = np.linalg.qr(U, mode="reduced")
             U_ortho /= (np.sqrt(subgrids[j][i].dx) * np.sqrt(subgrids[j][i].dy))
             R_U *= (np.sqrt(subgrids[j][i].dx) * np.sqrt(subgrids[j][i].dy))
