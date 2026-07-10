@@ -159,19 +159,6 @@ def integrate_dd_hohlraum(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                     new_row.append(new_lr)
                 lr_on_subgrids_old.append(new_row)
 
-            ### Calculate f
-            f_on_subgrids = []
-
-            for j in range(n_split_y):
-                row = []
-                for i in range(n_split_x):
-                    
-                    f = (lr_on_subgrids[j][i].U @ lr_on_subgrids[j][i].S @ 
-                        lr_on_subgrids[j][i].V.T)
-                    
-                    row.append(f)
-                f_on_subgrids.append(row)
-
             ### Update lr by PSI with adaptive rank strategy
             ### Run PSI with adaptive rank strategy
             for j in range(n_split_y):
@@ -408,19 +395,6 @@ def integrate_dd_lattice(lr0_on_subgrids: LR, subgrids: Grid_2x1d,
                     new_lr = LR(lr.U.copy(), lr.S.copy(), lr.V.copy())
                     new_row.append(new_lr)
                 lr_on_subgrids_old.append(new_row)
-
-            ### Calculate f
-            f_on_subgrids = []
-
-            for j in range(n_split_y):
-                row = []
-                for i in range(n_split_x):
-                    
-                    f = (lr_on_subgrids[j][i].U @ lr_on_subgrids[j][i].S @ 
-                        lr_on_subgrids[j][i].V.T)
-                    
-                    row.append(f)
-                f_on_subgrids.append(row)
 
             ### Update lr by PSI with adaptive rank strategy
             ### Run PSI with adaptive rank strategy
