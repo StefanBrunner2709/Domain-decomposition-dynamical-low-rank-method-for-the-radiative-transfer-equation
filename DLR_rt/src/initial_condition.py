@@ -165,7 +165,7 @@ def setInitialCondition_2x1d_lr(grid: Grid_2x1d, option_cond: str = "standard"):
         for i in range(grid.Ny):
             U[i * grid.Nx : (i + 1) * grid.Nx, 0] = (
                 1
-                / (2 * np.pi * 0.03**2)
+                / (2 * np.pi * 0.01**2)
                 * np.exp(-np.sqrt((grid.X - 0.5) ** 2 + (grid.Y[i] - 0.5) ** 2) 
                          / (2 * 0.03**2))
             )
