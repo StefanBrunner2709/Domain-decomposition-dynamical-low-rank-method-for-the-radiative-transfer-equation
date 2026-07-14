@@ -35,7 +35,7 @@ def run_dd_linesource(option_dof_plot = False):
     option_timescheme = "RK4"
     option_rank_adaptivity = "v2"
 
-    drop_tol = 1e-6
+    drop_tol = 2e-4
 
 
     ### Initial configuration

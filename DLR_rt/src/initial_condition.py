@@ -165,9 +165,9 @@ def setInitialCondition_2x1d_lr(grid: Grid_2x1d, option_cond: str = "standard"):
         for i in range(grid.Ny):
             U[i * grid.Nx : (i + 1) * grid.Nx, 0] = (
                 1
-                / (2 * np.pi * 0.01**2)
+                / (2 * np.pi * 0.001**2)
                 * np.exp(-np.sqrt((grid.X - 0.5) ** 2 + (grid.Y[i] - 0.5) ** 2) 
-                         / (2 * 0.03**2))
+                         / (2 * 0.05**2))
             )
         V[:,0] = 1.0 / grid.Nphi
         S[0, 0] = 1.0
@@ -236,10 +236,10 @@ def setInitialCondition_2x1d_lr_subgrids(subgrids, option_cond: str = "standard"
                 for k in range(subgrids[j][i].Ny):
                     U[k * subgrids[j][i].Nx : (k + 1) * subgrids[j][i].Nx, 0] = (
                         1
-                        / (2 * np.pi * 0.01**2)
+                        / (2 * np.pi * 0.001**2)
                         * np.exp(-np.sqrt((subgrids[j][i].X - 0.5) ** 2 
                                           + (subgrids[j][i].Y[k] - 0.5) ** 2) 
-                                / (2 * 0.03**2))
+                                / (2 * 0.05**2))
                     )
                 V[:,0] = 1.0 / subgrids[j][i].Nphi
                 S[0, 0] = 1.0
