@@ -16,7 +16,7 @@ To reproduce all the results, run
 ```shell
 python3 DLR_rt/examples/main.py
 ```
-One can also just run a single example (possible options are "lattice", "hohlraum" or "pointsource")
+One can also just run a single example (possible options are "lattice", "hohlraum", "pointsource" or "linesource".)
 ```shell
 python3 DLR_rt/examples/main.py lattice
 ```
@@ -25,4 +25,4 @@ or multiple chosen examples
 python3 DLR_rt/examples/main.py hohlraum pointsource
 ```
 In both the lattice and hohlraum example, first a reference solution on a single domain is calculated (with high rank), then a simulation on a single domain is run (with low rank) and then a simulation with domain decomposition is run.
-For the pointsource example, two different simulations with domain decomposition are run.
+For the pointsource and linesource examples, a simulation on one domain and a simulation with domain decomposition is run.

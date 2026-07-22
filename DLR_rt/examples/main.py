@@ -11,12 +11,16 @@ import sys
 
 from DLR_rt.examples.publication.dlr_2x1d_dd_hohlraum_splitting import run_dd_hohlraum
 from DLR_rt.examples.publication.dlr_2x1d_dd_lattice_splitting import run_dd_lattice
+from DLR_rt.examples.publication.dlr_2x1d_dd_linesource_splitting import (
+    run_dd_linesource,
+)
 from DLR_rt.examples.publication.dlr_2x1d_periodic_spacedepcoeff import run_1d
 
 VALID = {
     "lattice",
     "hohlraum",
-    "pointsource"
+    "pointsource",
+    "linesource"
 }
 
 if __name__ == "__main__":
@@ -73,4 +77,15 @@ if __name__ == "__main__":
         # Simulation with domain decomposition
         print("Running pointsource simulation with domain decomposition...")
         run_dd_hohlraum(option_problem="pointsource", option_dof_plot=True)
+
+    # ---- LINESOURCE EXAMPLE ----
+    if "linesource" in to_run:
+        ### Run linesource example
+        # Simulation on a single domain
+        print("Running linesource simulation on 1 domain...")
+        run_1d(option_problem="linesource")
+
+        # Simulation with domain decomposition
+        print("Running linesource simulation with domain decomposition...")
+        run_dd_linesource(option_problem="linesource", option_dof_plot=True)
         
