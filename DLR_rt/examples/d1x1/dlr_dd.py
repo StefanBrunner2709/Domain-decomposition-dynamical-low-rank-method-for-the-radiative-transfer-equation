@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
@@ -97,6 +99,9 @@ def integrate(
 
 
 ### Just one plot for certain rank and certain time
+#  Deterministic runs, remove np.random
+seed = 0
+np.random.seed(seed)
 
 Nx = 256
 Nmu = 128
@@ -105,7 +110,9 @@ r = 5
 t_f = 1.0
 fs = 30
 method = "lie"
-savepath = "plots/"
+# Repo root is three levels above this file, so the script works from any cwd
+savepath = Path(__file__).resolve().parents[3] / "plots"
+savepath.mkdir(parents=True, exist_ok=True)
 
 fig, axes = plt.subplots(1, 1, figsize=(10, 8))
 
@@ -131,6 +138,10 @@ f_right = lr_right.U @ lr_right.S @ lr_right.V.T
 # Concatenate left and right domain
 f = np.concatenate((f_left, f_right), axis=0)
 
+# save f object
+np.save(savepath / "det_check_dd.npy", f)
+
+
 im = axes.imshow(f.T, extent=extent, origin="lower", aspect=0.5)
 axes.set_xlabel("$x$", fontsize=fs)
 axes.set_ylabel(r"$\mu$", fontsize=fs, labelpad=-5)
@@ -147,15 +158,17 @@ cbar_fixed.ax.tick_params(labelsize=fs)
 plt.tight_layout()
 plt.savefig(
     savepath
-    + "dd_distr_funct_initalltanh_fixedcol_t"
-    + str(t_f)
-    + "_"
-    + method
-    + "_"
-    + str(dt)
-    + "_adaptrank_"
-    + str(Nx)
-    + "x"
-    + str(Nmu)
-    + ".pdf"
+    / (
+        "dd_distr_funct_initalltanh_fixedcol_t"
+        + str(t_f)
+        + "_"
+        + method
+        + "_"
+        + str(dt)
+        + "_adaptrank_"
+        + str(Nx)
+        + "x"
+        + str(Nmu)
+        + ".pdf"
+    )
 )

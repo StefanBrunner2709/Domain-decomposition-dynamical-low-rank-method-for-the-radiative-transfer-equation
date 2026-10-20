@@ -1,5 +1,7 @@
+from pathlib import Path
+
 import matplotlib.pyplot as plt
-import numpy as np  # noqa: F401
+import numpy as np
 from tqdm import tqdm
 
 from DLR_rt.src.grid import Grid_1x1d
@@ -104,6 +106,11 @@ def integrate(
 
 ### Just one plot for certain rank and certain time
 
+# Deterministic runs, remove np.random
+seed = 0
+np.random.seed(seed)
+
+
 Nx = 256
 Nmu = 128
 dt = 1e-3
@@ -111,7 +118,9 @@ r = 5
 t_f = 1.0
 fs = 22
 method = "lie"
-savepath = "plots/"
+# Repo root is three levels above this file, so the script works from any cwd
+savepath = Path(__file__).resolve().parents[3] / "plots"
+savepath.mkdir(parents=True, exist_ok=True)
 
 grid = Grid_1x1d(Nx, Nmu, r)
 lr0 = setInitialCondition_1x1d_lr(grid)
@@ -122,6 +131,10 @@ lr, time, rank = integrate(
     lr0, grid, t_f, dt, option=method, tol_sing_val=1e-7, drop_tol=1e-7
 )
 f = lr.U @ lr.S @ lr.V.T
+
+# Save f object
+np.save(savepath / "det_check_inflow.npy", f)
+
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
 
@@ -150,4 +163,4 @@ ax2.margins(x=0)
 ax2.set_xlim(0, 2)
 
 plt.tight_layout()
-plt.savefig(savepath + "distr_funct_adapt_rank_t" + str(t_f) + ".pdf")
+plt.savefig(savepath / ("distr_funct_adapt_rank_t" + str(t_f) + ".pdf"))
