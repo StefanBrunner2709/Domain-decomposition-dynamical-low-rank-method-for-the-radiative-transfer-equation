@@ -72,7 +72,8 @@ def integrate(
 
             ### Run PSI
             if option == "lie":
-                lr_1, grid_1, _, _ = PSI_lie(lr_1, grid_1, dt, F_b_1)
+                lr_1, grid_1, _, _ = PSI_lie(lr_1, grid_1, dt, F_b_1,  
+                                             option_scheme="upwind")
 
             if option == "strang":
                 lr_1, grid_1 = PSI_strang(lr_1, grid_1, dt, t, F_b_1)
@@ -87,7 +88,8 @@ def integrate(
 
             ### Run PSI
             if option == "lie":
-                lr_2, grid_2, _, _ = PSI_lie(lr_2, grid_2, dt, F_b_2)
+                lr_2, grid_2, _, _ = PSI_lie(lr_2, grid_2, dt, F_b_2, 
+                                             option_scheme="upwind")
 
             if option == "strang":
                 lr_2, grid_2 = PSI_strang(lr_2, grid_2, dt, t, F_b_2)
@@ -102,7 +104,8 @@ def integrate(
 
             ### Run PSI
             if option == "lie":
-                lr_3, grid_3, _, _ = PSI_lie(lr_3, grid_3, dt, F_b_3)
+                lr_3, grid_3, _, _ = PSI_lie(lr_3, grid_3, dt, F_b_3, 
+                                             option_scheme="upwind")
 
             if option == "strang":
                 lr_3, grid_3 = PSI_strang(lr_3, grid_3, dt, t, F_b_3)
@@ -117,7 +120,8 @@ def integrate(
 
             ### Run PSI
             if option == "lie":
-                lr_4, grid_4, _, _ = PSI_lie(lr_4, grid_4, dt, F_b_4)
+                lr_4, grid_4, _, _ = PSI_lie(lr_4, grid_4, dt, F_b_4, 
+                                             option_scheme="upwind")
 
             if option == "strang":
                 lr_4, grid_4 = PSI_strang(lr_4, grid_4, dt, t, F_b_4)
@@ -136,11 +140,11 @@ def integrate(
 
 ### Just one plot for certain rank and certain time
 
-Nx = 64
-Nmu = 64
-dt = 1e-4
+Nx = 256
+Nmu = 128
+dt = 1e-3
 r = 5
-t_f = 0.5
+t_f = 1.0
 fs = 30
 method = "lie"
 savepath = "plots/"
@@ -179,7 +183,7 @@ f_4 = lr_4.U @ lr_4.S @ lr_4.V.T
 # Concatenate left and right domain
 f = np.concatenate((f_1, f_2, f_3, f_4), axis=0)
 
-im = axes.imshow(f.T, extent=extent, origin="lower", aspect=0.5, vmin=0.0, vmax=1.0)
+im = axes.imshow(f.T, extent=extent, origin="lower", aspect=0.5)
 axes.set_xlabel("$x$", fontsize=fs)
 axes.set_ylabel(r"$\mu$", fontsize=fs, labelpad=-5)
 axes.set_xticks([0, 0.5, 1])
@@ -188,7 +192,8 @@ axes.tick_params(axis="both", labelsize=fs, pad=20)
 axes.set_title("$t=$" + str(t_f), fontsize=fs)
 
 cbar_fixed = fig.colorbar(im, ax=axes)
-cbar_fixed.set_ticks([0, 0.5, 1])
+# cbar_fixed.set_ticks([0, 0.5, 1])
+cbar_fixed.set_ticks([np.min(f), np.max(f)])
 cbar_fixed.ax.tick_params(labelsize=fs)
 
 plt.tight_layout()

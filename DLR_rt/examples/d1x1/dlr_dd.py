@@ -57,7 +57,8 @@ def integrate(
 
             ### Run PSI
             if option == "lie":
-                lr_left, grid_left, _, _ = PSI_lie(lr_left, grid_left, dt, F_b_left)
+                lr_left, grid_left, _, _ = PSI_lie(lr_left, grid_left, dt, F_b_left, 
+                                                   option_scheme="upwind")
 
             if option == "strang":
                 lr_left, grid_left = PSI_strang(lr_left, grid_left, dt, t, F_b_left)
@@ -75,7 +76,8 @@ def integrate(
             ### Run PSI
             if option == "lie":
                 lr_right, grid_right, _, _ = PSI_lie(lr_right, grid_right, 
-                                                      dt, F_b_right)
+                                                      dt, F_b_right, 
+                                                      option_scheme="upwind")
 
             if option == "strang":
                 lr_right, grid_right = PSI_strang(
@@ -96,11 +98,11 @@ def integrate(
 
 ### Just one plot for certain rank and certain time
 
-Nx = 64
-Nmu = 64
-dt = 1e-4
+Nx = 256
+Nmu = 128
+dt = 1e-3
 r = 5
-t_f = 0.5
+t_f = 1.0
 fs = 30
 method = "lie"
 savepath = "plots/"
@@ -129,7 +131,7 @@ f_right = lr_right.U @ lr_right.S @ lr_right.V.T
 # Concatenate left and right domain
 f = np.concatenate((f_left, f_right), axis=0)
 
-im = axes.imshow(f.T, extent=extent, origin="lower", aspect=0.5, vmin=0.0, vmax=1.0)
+im = axes.imshow(f.T, extent=extent, origin="lower", aspect=0.5)
 axes.set_xlabel("$x$", fontsize=fs)
 axes.set_ylabel(r"$\mu$", fontsize=fs, labelpad=-5)
 axes.set_xticks([0, 0.5, 1])
@@ -138,7 +140,8 @@ axes.tick_params(axis="both", labelsize=fs, pad=20)
 axes.set_title("$t=$" + str(t_f), fontsize=fs)
 
 cbar_fixed = fig.colorbar(im, ax=axes)
-cbar_fixed.set_ticks([0, 0.5, 1])
+# cbar_fixed.set_ticks([0, 0.5, 1])
+cbar_fixed.set_ticks([np.min(f), np.max(f)])
 cbar_fixed.ax.tick_params(labelsize=fs)
 
 plt.tight_layout()

@@ -104,8 +104,8 @@ def integrate(
 
 ### Just one plot for certain rank and certain time
 
-Nx = 64
-Nmu = 64
+Nx = 256
+Nmu = 128
 dt = 1e-3
 r = 5
 t_f = 1.0

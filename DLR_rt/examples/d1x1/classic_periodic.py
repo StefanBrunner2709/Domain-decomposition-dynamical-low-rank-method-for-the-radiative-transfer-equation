@@ -126,7 +126,7 @@ def rhs(f: np.ndarray, grid: Grid_1x1d, epsilon: float, option: str):
 
 fs = 16
 n = 64
-t_final = 0.1
+t_final = 0.5
 t_string = "t03"
 sigma = 1.0
 savepath = "plots/"
