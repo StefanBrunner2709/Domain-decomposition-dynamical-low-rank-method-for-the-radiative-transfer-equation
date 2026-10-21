@@ -148,90 +148,92 @@ def integrate(
 
 ### Just one plot for certain rank and certain time
 
-# Deterministic runs, remove np.random
-seed = 0
-np.random.seed(seed)
-
-Nx = 256
-Nmu = 128
-dt = 1e-3
-r = 5
-t_f = 1.0
-fs = 22
-method = "lie"
-# tracemalloc slows down the run --> so this can be activated here
-measure_memory = False
-# Repo root is three levels above this file, so the script works from any cwd
-savepath = Path(__file__).resolve().parents[3] / "plots"
-savepath.mkdir(parents=True, exist_ok=True)
-
-grid = Grid_1x1d(Nx, Nmu, r)
-lr0 = setInitialCondition_1x1d_lr(grid)
-f0 = lr0.U @ lr0.S @ lr0.V.T
-extent = [grid.X[0], grid.X[-1], grid.MU[0], grid.MU[-1]]
-
-# Time measurement, only the time integration
-if measure_memory:
-    tracemalloc.start()
-
-t0 = perf_counter()
-lr, time, rank, timings, mem_peak = integrate(
-    lr0, grid, t_f, dt, option=method, tol_sing_val=1e-7, drop_tol=1e-7
-)
-runtime = perf_counter() - t0
-print(f"Runtime: {runtime:.2f} seconds")
-
-if measure_memory:
-    tracemalloc.stop()
-    print("Timings are distorted by tracemalloc in this run!")
-    print("Peak additional memory per phase:")
-    for key, value in mem_peak.items():
-        print(f"{key}: {value / 1024:.1f} KB")
-
-f = lr.U @ lr.S @ lr.V.T
-
-# compute memory usage of f
-mem_lr = lr.U.nbytes + lr.S.nbytes + lr.V.nbytes
-mem_f = f.nbytes
-print(f"Memory usage of f: {mem_f / 1024**2:.2f} MB")
-print(f"Memory usage of low-rank representation: {mem_lr / 1024**2:.2f} MB")
-print(f"Memory reduction factor: {mem_f / mem_lr:.2f}")
-
-
-# print timings
-print("Timings:")
-for key, value in timings.items():
-    print(f"{key}: {value:.2f} seconds")
-
-# Save f object
-np.save(savepath / "det_check_inflow.npy", f)
-
-
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
-
-im = ax1.imshow(f.T, extent=extent, origin='lower', aspect=0.5)
-# im = ax1.imshow(f.T, extent=extent, origin="lower", aspect=0.5, vmin=0.0, vmax=1.0)
-ax1.set_xlabel("$x$", fontsize=fs)
-ax1.set_ylabel(r"$\mu$", fontsize=fs, labelpad=-5)
-ax1.set_xticks([0, 0.5, 1])
-ax1.set_yticks([-1, 0, 1])
-ax1.tick_params(axis="both", labelsize=fs, pad=20)
-ax1.set_title(r"$f(t,x,\mu)$", fontsize=fs)
-
-cbar_fixed = fig.colorbar(im, ax=ax1, shrink=1)
-# cbar_fixed.set_ticks([np.ceil(np.min(f)*10000)/10000,
-#                       np.floor(np.max(f)*10000)/10000])
-cbar_fixed.set_ticks([np.min(f), np.max(f)])
-cbar_fixed.ax.tick_params(labelsize=fs)
-
-ax2.plot(time, rank)
-ax2.set_xlabel("$t$", fontsize=22)
-ax2.set_ylabel("rank $r(t)$", fontsize=22)
-ax2.tick_params(axis="both", labelsize=22)
-ax2.set_yticks([5, 6, 7, 8, 9, 10])
-ax2.set_xticks([0, 1, 2])
-ax2.margins(x=0)
-ax2.set_xlim(0, 2)
-
-plt.tight_layout()
-plt.savefig(savepath / ("distr_funct_adapt_rank_t" + str(t_f) + ".pdf"))
+if __name__ == "__main__":
+    
+    # Deterministic runs, remove np.random
+    seed = 0
+    np.random.seed(seed)
+    
+    Nx = 256
+    Nmu = 128
+    dt = 1e-3
+    r = 5
+    t_f = 1.0
+    fs = 22
+    method = "lie"
+    # tracemalloc slows down the run --> so this can be activated here
+    measure_memory = False
+    # Repo root is three levels above this file, so the script works from any cwd
+    savepath = Path(__file__).resolve().parents[3] / "plots"
+    savepath.mkdir(parents=True, exist_ok=True)
+    
+    grid = Grid_1x1d(Nx, Nmu, r)
+    lr0 = setInitialCondition_1x1d_lr(grid)
+    f0 = lr0.U @ lr0.S @ lr0.V.T
+    extent = [grid.X[0], grid.X[-1], grid.MU[0], grid.MU[-1]]
+    
+    # Time measurement, only the time integration
+    if measure_memory:
+        tracemalloc.start()
+    
+    t0 = perf_counter()
+    lr, time, rank, timings, mem_peak = integrate(
+        lr0, grid, t_f, dt, option=method, tol_sing_val=1e-7, drop_tol=1e-7
+    )
+    runtime = perf_counter() - t0
+    print(f"Runtime: {runtime:.2f} seconds")
+    
+    if measure_memory:
+        tracemalloc.stop()
+        print("Timings are distorted by tracemalloc in this run!")
+        print("Peak additional memory per phase:")
+        for key, value in mem_peak.items():
+            print(f"{key}: {value / 1024:.1f} KB")
+    
+    f = lr.U @ lr.S @ lr.V.T
+    
+    # compute memory usage of f
+    mem_lr = lr.U.nbytes + lr.S.nbytes + lr.V.nbytes
+    mem_f = f.nbytes
+    print(f"Memory usage of f: {mem_f / 1024**2:.2f} MB")
+    print(f"Memory usage of low-rank representation: {mem_lr / 1024**2:.2f} MB")
+    print(f"Memory reduction factor: {mem_f / mem_lr:.2f}")
+    
+    
+    # print timings
+    print("Timings:")
+    for key, value in timings.items():
+        print(f"{key}: {value:.2f} seconds")
+    
+    # Save f object
+    np.save(savepath / "det_check_inflow.npy", f)
+    
+    
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+    
+    im = ax1.imshow(f.T, extent=extent, origin='lower', aspect=0.5)
+    # im = ax1.imshow(f.T, extent=extent, origin="lower", aspect=0.5, vmin=0.0, vmax=1.0)
+    ax1.set_xlabel("$x$", fontsize=fs)
+    ax1.set_ylabel(r"$\mu$", fontsize=fs, labelpad=-5)
+    ax1.set_xticks([0, 0.5, 1])
+    ax1.set_yticks([-1, 0, 1])
+    ax1.tick_params(axis="both", labelsize=fs, pad=20)
+    ax1.set_title(r"$f(t,x,\mu)$", fontsize=fs)
+    
+    cbar_fixed = fig.colorbar(im, ax=ax1, shrink=1)
+    # cbar_fixed.set_ticks([np.ceil(np.min(f)*10000)/10000,
+    #                       np.floor(np.max(f)*10000)/10000])
+    cbar_fixed.set_ticks([np.min(f), np.max(f)])
+    cbar_fixed.ax.tick_params(labelsize=fs)
+    
+    ax2.plot(time, rank)
+    ax2.set_xlabel("$t$", fontsize=22)
+    ax2.set_ylabel("rank $r(t)$", fontsize=22)
+    ax2.tick_params(axis="both", labelsize=22)
+    ax2.set_yticks([5, 6, 7, 8, 9, 10])
+    ax2.set_xticks([0, 1, 2])
+    ax2.margins(x=0)
+    ax2.set_xlim(0, 2)
+    
+    plt.tight_layout()
+    plt.savefig(savepath / ("distr_funct_adapt_rank_t" + str(t_f) + ".pdf"))

@@ -54,7 +54,7 @@ def integrate(
         "PSI_right": 0.0,
         "drop_basis_right": 0.0,
     }
-    # Peak additional memory per phase in bytes, only filled if tracemalloc runs
+    # Peak additional memory per phase in bytes
     mem_peak = dict.fromkeys(timings, 0)
 
     with tqdm(total=t_f / dt, desc="Running Simulation") as pbar:
@@ -156,103 +156,106 @@ def integrate(
 
 ### Just one plot for certain rank and certain time
 #  Deterministic runs, remove np.random
-seed = 0
-np.random.seed(seed)
 
-Nx = 256
-Nmu = 128
-dt = 1e-3
-r = 5
-t_f = 1.0
-fs = 30
-method = "lie"
-# tracemalloc slows the run down, so never use timings from a memory run
-measure_memory = False
-# Repo root is three levels above this file, so the script works from any cwd
-savepath = Path(__file__).resolve().parents[3] / "plots"
-savepath.mkdir(parents=True, exist_ok=True)
-
-fig, axes = plt.subplots(1, 1, figsize=(10, 8))
-
-grid = Grid_1x1d(Nx, Nmu, r)
-grid_left, grid_right = grid.split()
-lr0_left = setInitialCondition_1x1d_lr(grid_left)
-lr0_right = setInitialCondition_1x1d_lr(grid_right)
-extent = [grid_left.X[0], grid_right.X[-1], grid_left.MU[0], grid_left.MU[-1]]
-
-if measure_memory:
-    tracemalloc.start()
-t0 = perf_counter()
-lr_left, lr_right, time, timings, mem_peak = integrate(
-    lr0_left,
-    lr0_right,
-    grid_left,
-    grid_right,
-    t_f,
-    dt,
-    option=method,
-    tol_sing_val=1e-5,
-    drop_tol=1e-5,
-)
-runtime = perf_counter() - t0
-print(f"Runtime: {runtime:.2f} seconds")
-
-print("Timings:")
-for key, value in timings.items():
-    print(f"{key}: {value:.2f} seconds")
-
-if measure_memory:
-    tracemalloc.stop()
-    print("Timings are distorted by tracemalloc in this run!")
-    print("Peak additional memory per phase:")
-    for key, value in mem_peak.items():
-        print(f"{key}: {value / 1024:.1f} KB")
-
-f_left = lr_left.U @ lr_left.S @ lr_left.V.T
-
-f_right = lr_right.U @ lr_right.S @ lr_right.V.T
-
-# Concatenate left and right domain
-f = np.concatenate((f_left, f_right), axis=0)
-
-# Compute memory usage of f
-mem_lr = lr_left.U.nbytes + lr_left.S.nbytes + lr_left.V.nbytes + lr_right.U.nbytes + lr_right.S.nbytes + lr_right.V.nbytes 
-mem_f = f.nbytes
-print(f"Memory usage of f: {mem_f / 1024**2:.2f} MB")
-print(f"Memory usage of low-rank representation: {mem_lr / 1024**2:.2f} MB")
-print(f"Memory reduction factor: {mem_f / mem_lr:.2f}")
-
-# save f object
-np.save(savepath / "det_check_dd.npy", f)
-
-
-im = axes.imshow(f.T, extent=extent, origin="lower", aspect=0.5)
-axes.set_xlabel("$x$", fontsize=fs)
-axes.set_ylabel(r"$\mu$", fontsize=fs, labelpad=-5)
-axes.set_xticks([0, 0.5, 1])
-axes.set_yticks([-1, 0, 1])
-axes.tick_params(axis="both", labelsize=fs, pad=20)
-axes.set_title("$t=$" + str(t_f), fontsize=fs)
-
-cbar_fixed = fig.colorbar(im, ax=axes)
-# cbar_fixed.set_ticks([0, 0.5, 1])
-cbar_fixed.set_ticks([np.min(f), np.max(f)])
-cbar_fixed.ax.tick_params(labelsize=fs)
-
-plt.tight_layout()
-plt.savefig(
-    savepath
-    / (
-        "dd_distr_funct_initalltanh_fixedcol_t"
-        + str(t_f)
-        + "_"
-        + method
-        + "_"
-        + str(dt)
-        + "_adaptrank_"
-        + str(Nx)
-        + "x"
-        + str(Nmu)
-        + ".pdf"
+if __name__ == "__main__":
+    
+    seed = 0
+    np.random.seed(seed)
+    
+    Nx = 256
+    Nmu = 128
+    dt = 1e-3
+    r = 5
+    t_f = 1.0
+    fs = 30
+    method = "lie"
+    # tracemalloc slows the run down, so never use timings from a memory run
+    measure_memory = False
+    # Repo root is three levels above this file, so the script works from any cwd
+    savepath = Path(__file__).resolve().parents[3] / "plots"
+    savepath.mkdir(parents=True, exist_ok=True)
+    
+    fig, axes = plt.subplots(1, 1, figsize=(10, 8))
+    
+    grid = Grid_1x1d(Nx, Nmu, r)
+    grid_left, grid_right = grid.split()
+    lr0_left = setInitialCondition_1x1d_lr(grid_left)
+    lr0_right = setInitialCondition_1x1d_lr(grid_right)
+    extent = [grid_left.X[0], grid_right.X[-1], grid_left.MU[0], grid_left.MU[-1]]
+    
+    if measure_memory:
+        tracemalloc.start()
+    t0 = perf_counter()
+    lr_left, lr_right, time, timings, mem_peak = integrate(
+        lr0_left,
+        lr0_right,
+        grid_left,
+        grid_right,
+        t_f,
+        dt,
+        option=method,
+        tol_sing_val=1e-5,
+        drop_tol=1e-5,
     )
-)
+    runtime = perf_counter() - t0
+    print(f"Runtime: {runtime:.2f} seconds")
+    
+    print("Timings:")
+    for key, value in timings.items():
+        print(f"{key}: {value:.2f} seconds")
+    
+    if measure_memory:
+        tracemalloc.stop()
+        print("Timings are distorted by tracemalloc in this run!")
+        print("Peak additional memory per phase:")
+        for key, value in mem_peak.items():
+            print(f"{key}: {value / 1024:.1f} KB")
+    
+    f_left = lr_left.U @ lr_left.S @ lr_left.V.T
+    
+    f_right = lr_right.U @ lr_right.S @ lr_right.V.T
+    
+    # Concatenate left and right domain
+    f = np.concatenate((f_left, f_right), axis=0)
+    
+    # Compute memory usage of f
+    mem_lr = lr_left.U.nbytes + lr_left.S.nbytes + lr_left.V.nbytes + lr_right.U.nbytes + lr_right.S.nbytes + lr_right.V.nbytes 
+    mem_f = f.nbytes
+    print(f"Memory usage of f: {mem_f / 1024**2:.2f} MB")
+    print(f"Memory usage of low-rank representation: {mem_lr / 1024**2:.2f} MB")
+    print(f"Memory reduction factor: {mem_f / mem_lr:.2f}")
+    
+    # save f object
+    np.save(savepath / "det_check_dd.npy", f)
+    
+    
+    im = axes.imshow(f.T, extent=extent, origin="lower", aspect=0.5)
+    axes.set_xlabel("$x$", fontsize=fs)
+    axes.set_ylabel(r"$\mu$", fontsize=fs, labelpad=-5)
+    axes.set_xticks([0, 0.5, 1])
+    axes.set_yticks([-1, 0, 1])
+    axes.tick_params(axis="both", labelsize=fs, pad=20)
+    axes.set_title("$t=$" + str(t_f), fontsize=fs)
+    
+    cbar_fixed = fig.colorbar(im, ax=axes)
+    # cbar_fixed.set_ticks([0, 0.5, 1])
+    cbar_fixed.set_ticks([np.min(f), np.max(f)])
+    cbar_fixed.ax.tick_params(labelsize=fs)
+    
+    plt.tight_layout()
+    plt.savefig(
+        savepath
+        / (
+            "dd_distr_funct_initalltanh_fixedcol_t"
+            + str(t_f)
+            + "_"
+            + method
+            + "_"
+            + str(dt)
+            + "_adaptrank_"
+            + str(Nx)
+            + "x"
+            + str(Nmu)
+            + ".pdf"
+        )
+    )
