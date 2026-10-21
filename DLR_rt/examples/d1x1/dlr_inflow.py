@@ -1,13 +1,27 @@
-from pathlib import Path
+# Set BLAS and LAPACK threads to 1 to avoid oversubscription.
+# Must happen before numpy is imported, otherwise BLAS ignores it.
+import os
 
-import matplotlib.pyplot as plt
-import numpy as np
-from tqdm import tqdm
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
 
-from DLR_rt.src.grid import Grid_1x1d
-from DLR_rt.src.initial_condition import setInitialCondition_1x1d_lr
-from DLR_rt.src.integrators import PSI_lie, PSI_strang
-from DLR_rt.src.lr import LR, add_basis_functions, computeF_b, drop_basis_functions
+from pathlib import Path  # noqa: E402
+from time import perf_counter  # noqa: E402
+
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+from tqdm import tqdm  # noqa: E402
+
+from DLR_rt.src.grid import Grid_1x1d  # noqa: E402
+from DLR_rt.src.initial_condition import setInitialCondition_1x1d_lr  # noqa: E402
+from DLR_rt.src.integrators import PSI_lie, PSI_strang  # noqa: E402
+from DLR_rt.src.lr import (  # noqa: E402
+    LR,
+    add_basis_functions,
+    computeF_b,
+    drop_basis_functions,
+)
 
 
 def integrate(
@@ -27,6 +41,10 @@ def integrate(
     adapt_rank.append(grid.r)
     # vid_frame = 0
 
+    # Timings
+    timings = {"F_b": 0.0, "add_basis": 0.0, "PSI": 0.0, "drop_basis": 0.0}
+
+
     with tqdm(total=t_f / dt, desc="Running Simulation") as pbar:
         while t < t_f:
             pbar.update(1)
@@ -35,20 +53,33 @@ def integrate(
                 dt = t_f - t
 
             ### Compute F_b
+            
+            t0 = perf_counter()
+
             F_b = computeF_b(t, lr.U @ lr.S @ lr.V.T, grid)
 
+            timings["F_b"] += perf_counter() - t0
+
             ### Add basis for adaptive rank strategy:
+
+            t0 = perf_counter()
+
             lr, grid = add_basis_functions(lr, grid, F_b, tol_sing_val)
+
+            timings["add_basis"] += perf_counter() - t0
 
             ### Run PSI
             if option == "lie":
+                t0 = perf_counter()
                 lr, grid, _, _  = PSI_lie(lr, grid, dt, F_b, option_scheme="upwind")
-
+                timings["PSI"] += perf_counter() - t0
             if option == "strang":
                 lr, grid = PSI_strang(lr, grid, dt, t, F_b)
 
             ### Drop basis for adaptive rank strategy:
+            t0 = perf_counter()
             lr, grid = drop_basis_functions(lr, grid, drop_tol)
+            timings["drop_basis"] += perf_counter() - t0
 
             t += dt
             time.append(t)
@@ -101,7 +132,7 @@ def integrate(
             #     plt.tight_layout()
             #     plt.savefig(savepath + f"frame_{vid_frame:04d}.png")
 
-    return lr, time, adapt_rank
+    return lr, time, adapt_rank, timings
 
 
 ### Just one plot for certain rank and certain time
@@ -109,7 +140,6 @@ def integrate(
 # Deterministic runs, remove np.random
 seed = 0
 np.random.seed(seed)
-
 
 Nx = 256
 Nmu = 128
@@ -127,10 +157,20 @@ lr0 = setInitialCondition_1x1d_lr(grid)
 f0 = lr0.U @ lr0.S @ lr0.V.T
 extent = [grid.X[0], grid.X[-1], grid.MU[0], grid.MU[-1]]
 
-lr, time, rank = integrate(
+# Time measurement, only the time integration
+t0 = perf_counter()
+lr, time, rank, timings = integrate(
     lr0, grid, t_f, dt, option=method, tol_sing_val=1e-7, drop_tol=1e-7
 )
+runtime = perf_counter() - t0
+print(f"Runtime: {runtime:.2f} seconds")
+
 f = lr.U @ lr.S @ lr.V.T
+
+# print timings
+print("Timings:")
+for key, value in timings.items():
+    print(f"{key}: {value:.2f} seconds")
 
 # Save f object
 np.save(savepath / "det_check_inflow.npy", f)

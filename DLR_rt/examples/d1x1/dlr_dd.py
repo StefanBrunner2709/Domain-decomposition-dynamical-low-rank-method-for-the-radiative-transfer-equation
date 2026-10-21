@@ -1,13 +1,27 @@
-from pathlib import Path
+# Set BLAS and LAPACK threads to 1 to avoid oversubscription.
+# Must happen before numpy is imported, otherwise BLAS ignores it.
+import os
 
-import matplotlib.pyplot as plt
-import numpy as np
-from tqdm import tqdm
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
 
-from DLR_rt.src.grid import Grid_1x1d
-from DLR_rt.src.initial_condition import setInitialCondition_1x1d_lr
-from DLR_rt.src.integrators import PSI_lie, PSI_strang
-from DLR_rt.src.lr import LR, add_basis_functions, computeF_b, drop_basis_functions
+from pathlib import Path  # noqa: E402
+from time import perf_counter  # noqa: E402
+
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+from tqdm import tqdm  # noqa: E402
+
+from DLR_rt.src.grid import Grid_1x1d  # noqa: E402
+from DLR_rt.src.initial_condition import setInitialCondition_1x1d_lr  # noqa: E402
+from DLR_rt.src.integrators import PSI_lie, PSI_strang  # noqa: E402
+from DLR_rt.src.lr import (  # noqa: E402
+    LR,
+    add_basis_functions,
+    computeF_b,
+    drop_basis_functions,
+)
 
 
 def integrate(
@@ -29,6 +43,17 @@ def integrate(
     # adapt_rank = []
     # adapt_rank.append(grid.r)
 
+    # Timings, F_b covers both domains since it becomes the exchange in MPI
+    timings = {
+        "F_b": 0.0,
+        "add_basis_left": 0.0,
+        "PSI_left": 0.0,
+        "drop_basis_left": 0.0,
+        "add_basis_right": 0.0,
+        "PSI_right": 0.0,
+        "drop_basis_right": 0.0,
+    }
+
     with tqdm(total=t_f / dt, desc="Running Simulation") as pbar:
         while t < t_f:
             pbar.update(1)
@@ -37,6 +62,7 @@ def integrate(
                 dt = t_f - t
 
             ### Compute F_b
+            t0 = perf_counter()
             F_b_left = computeF_b(
                 t,
                 lr_left.U @ lr_left.S @ lr_left.V.T,
@@ -49,45 +75,58 @@ def integrate(
                 grid_right,
                 f_left=lr_left.U @ lr_left.S @ lr_left.V.T,
             )
+            timings["F_b"] += perf_counter() - t0
 
             ### Update left side
 
             ### Add basis for adaptive rank strategy:
+            t0 = perf_counter()
             lr_left, grid_left = add_basis_functions(
                 lr_left, grid_left, F_b_left, tol_sing_val
             )
+            timings["add_basis_left"] += perf_counter() - t0
 
             ### Run PSI
+            t0 = perf_counter()
             if option == "lie":
-                lr_left, grid_left, _, _ = PSI_lie(lr_left, grid_left, dt, F_b_left, 
+                lr_left, grid_left, _, _ = PSI_lie(lr_left, grid_left, dt, F_b_left,
                                                    option_scheme="upwind")
 
             if option == "strang":
                 lr_left, grid_left = PSI_strang(lr_left, grid_left, dt, t, F_b_left)
+            timings["PSI_left"] += perf_counter() - t0
 
             ### Drop basis for adaptive rank strategy:
+            t0 = perf_counter()
             lr_left, grid_left = drop_basis_functions(lr_left, grid_left, drop_tol)
+            timings["drop_basis_left"] += perf_counter() - t0
 
             ### Update right side
 
             ### Add basis for adaptive rank strategy:
+            t0 = perf_counter()
             lr_right, grid_right = add_basis_functions(
                 lr_right, grid_right, F_b_right, tol_sing_val
             )
+            timings["add_basis_right"] += perf_counter() - t0
 
             ### Run PSI
+            t0 = perf_counter()
             if option == "lie":
-                lr_right, grid_right, _, _ = PSI_lie(lr_right, grid_right, 
-                                                      dt, F_b_right, 
+                lr_right, grid_right, _, _ = PSI_lie(lr_right, grid_right,
+                                                      dt, F_b_right,
                                                       option_scheme="upwind")
 
             if option == "strang":
                 lr_right, grid_right = PSI_strang(
                     lr_right, grid_right, dt, t, F_b_right
                 )
+            timings["PSI_right"] += perf_counter() - t0
 
             ### Drop basis for adaptive rank strategy:
+            t0 = perf_counter()
             lr_right, grid_right = drop_basis_functions(lr_right, grid_right, drop_tol)
+            timings["drop_basis_right"] += perf_counter() - t0
 
             # Update time
             t += dt
@@ -95,7 +134,7 @@ def integrate(
 
             # adapt_rank.append(grid.r)
 
-    return lr_left, lr_right, time
+    return lr_left, lr_right, time, timings
 
 
 ### Just one plot for certain rank and certain time
@@ -122,7 +161,8 @@ lr0_left = setInitialCondition_1x1d_lr(grid_left)
 lr0_right = setInitialCondition_1x1d_lr(grid_right)
 extent = [grid_left.X[0], grid_right.X[-1], grid_left.MU[0], grid_left.MU[-1]]
 
-lr_left, lr_right, time = integrate(
+t0 = perf_counter()
+lr_left, lr_right, time, timings = integrate(
     lr0_left,
     lr0_right,
     grid_left,
@@ -133,6 +173,12 @@ lr_left, lr_right, time = integrate(
     tol_sing_val=1e-5,
     drop_tol=1e-5,
 )
+runtime = perf_counter() - t0
+print(f"Runtime: {runtime:.2f} seconds")
+
+print("Timings:")
+for key, value in timings.items():
+    print(f"{key}: {value:.2f} seconds")
 f_left = lr_left.U @ lr_left.S @ lr_left.V.T
 f_right = lr_right.U @ lr_right.S @ lr_right.V.T
 # Concatenate left and right domain
