@@ -2,6 +2,8 @@
 Contains helper functions.
 """
 
+import tracemalloc
+
 import matplotlib.colors as colors
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
@@ -826,7 +828,47 @@ def save_data_to_file(savepath, filename, lr, time, rank_int, rank):
         Rank vector.
     """
 
-    np.savez(f"{savepath}{filename}_t{time[-1]:.4f}.npz", 
+    np.savez(f"{savepath}{filename}_t{time[-1]:.4f}.npz",
              U=lr.U, S=lr.S, V=lr.V, time=time, rank_int=rank_int, rank=rank)
+
+    return
+
+
+def mem_phase_start():
+    """
+    Start memory measurement of one phase.
+
+    Resets the tracemalloc peak. Does nothing if tracemalloc is not running.
+
+    Returns
+    -------
+    mem0
+        Currently traced memory in bytes, i.e. the baseline of the phase.
+    """
+    if not tracemalloc.is_tracing():
+        return 0
+    tracemalloc.reset_peak()
+    return tracemalloc.get_traced_memory()[0]
+
+
+def mem_phase_end(mem_peak, key, mem0):
+    """
+    End memory measurement of one phase.
+
+    Stores the largest additional memory the phase needed on top of mem0,
+    maximised over all calls.
+
+    Parameters
+    ----------
+    mem_peak
+        Dictionary with peak memory per phase in bytes.
+    key
+        Name of the phase.
+    mem0
+        Baseline returned by mem_phase_start.
+    """
+    if tracemalloc.is_tracing():
+        peak = tracemalloc.get_traced_memory()[1]
+        mem_peak[key] = max(mem_peak[key], peak - mem0)
 
     return

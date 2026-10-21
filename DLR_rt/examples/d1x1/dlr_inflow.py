@@ -1,17 +1,17 @@
-# Set BLAS and LAPACK threads to 1 to avoid oversubscription.
-# Must happen before numpy is imported, otherwise BLAS ignores it.
+# Set BLAS and LAPACK threads to 1 because np sometimes uses more
 import os
 
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 
-from pathlib import Path  # noqa: E402
-from time import perf_counter  # noqa: E402
+import tracemalloc
+from pathlib import Path
+from time import perf_counter
 
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-from tqdm import tqdm  # noqa: E402
+import matplotlib.pyplot as plt  
+import numpy as np  
+from tqdm import tqdm  
 
 from DLR_rt.src.grid import Grid_1x1d  # noqa: E402
 from DLR_rt.src.initial_condition import setInitialCondition_1x1d_lr  # noqa: E402
@@ -22,6 +22,7 @@ from DLR_rt.src.lr import (  # noqa: E402
     computeF_b,
     drop_basis_functions,
 )
+from DLR_rt.src.util import mem_phase_end, mem_phase_start  # noqa: E402
 
 
 def integrate(
@@ -43,6 +44,8 @@ def integrate(
 
     # Timings
     timings = {"F_b": 0.0, "add_basis": 0.0, "PSI": 0.0, "drop_basis": 0.0}
+    # Peak additional memory per phase in bytes
+    mem_peak = {"F_b": 0, "add_basis": 0, "PSI": 0, "drop_basis": 0}
 
 
     with tqdm(total=t_f / dt, desc="Running Simulation") as pbar:
@@ -53,32 +56,40 @@ def integrate(
                 dt = t_f - t
 
             ### Compute F_b
-            
+
             t0 = perf_counter()
+            m0 = mem_phase_start()
 
             F_b = computeF_b(t, lr.U @ lr.S @ lr.V.T, grid)
 
+            mem_phase_end(mem_peak, "F_b", m0)
             timings["F_b"] += perf_counter() - t0
 
             ### Add basis for adaptive rank strategy:
 
             t0 = perf_counter()
+            m0 = mem_phase_start()
 
             lr, grid = add_basis_functions(lr, grid, F_b, tol_sing_val)
 
+            mem_phase_end(mem_peak, "add_basis", m0)
             timings["add_basis"] += perf_counter() - t0
 
             ### Run PSI
             if option == "lie":
                 t0 = perf_counter()
+                m0 = mem_phase_start()
                 lr, grid, _, _  = PSI_lie(lr, grid, dt, F_b, option_scheme="upwind")
+                mem_phase_end(mem_peak, "PSI", m0)
                 timings["PSI"] += perf_counter() - t0
             if option == "strang":
                 lr, grid = PSI_strang(lr, grid, dt, t, F_b)
 
             ### Drop basis for adaptive rank strategy:
             t0 = perf_counter()
+            m0 = mem_phase_start()
             lr, grid = drop_basis_functions(lr, grid, drop_tol)
+            mem_phase_end(mem_peak, "drop_basis", m0)
             timings["drop_basis"] += perf_counter() - t0
 
             t += dt
@@ -132,7 +143,7 @@ def integrate(
             #     plt.tight_layout()
             #     plt.savefig(savepath + f"frame_{vid_frame:04d}.png")
 
-    return lr, time, adapt_rank, timings
+    return lr, time, adapt_rank, timings, mem_peak
 
 
 ### Just one plot for certain rank and certain time
@@ -148,6 +159,8 @@ r = 5
 t_f = 1.0
 fs = 22
 method = "lie"
+# tracemalloc slows down the run --> so this can be activated here
+measure_memory = False
 # Repo root is three levels above this file, so the script works from any cwd
 savepath = Path(__file__).resolve().parents[3] / "plots"
 savepath.mkdir(parents=True, exist_ok=True)
@@ -158,14 +171,32 @@ f0 = lr0.U @ lr0.S @ lr0.V.T
 extent = [grid.X[0], grid.X[-1], grid.MU[0], grid.MU[-1]]
 
 # Time measurement, only the time integration
+if measure_memory:
+    tracemalloc.start()
+
 t0 = perf_counter()
-lr, time, rank, timings = integrate(
+lr, time, rank, timings, mem_peak = integrate(
     lr0, grid, t_f, dt, option=method, tol_sing_val=1e-7, drop_tol=1e-7
 )
 runtime = perf_counter() - t0
 print(f"Runtime: {runtime:.2f} seconds")
 
+if measure_memory:
+    tracemalloc.stop()
+    print("Timings are distorted by tracemalloc in this run!")
+    print("Peak additional memory per phase:")
+    for key, value in mem_peak.items():
+        print(f"{key}: {value / 1024:.1f} KB")
+
 f = lr.U @ lr.S @ lr.V.T
+
+# compute memory usage of f
+mem_lr = lr.U.nbytes + lr.S.nbytes + lr.V.nbytes
+mem_f = f.nbytes
+print(f"Memory usage of f: {mem_f / 1024**2:.2f} MB")
+print(f"Memory usage of low-rank representation: {mem_lr / 1024**2:.2f} MB")
+print(f"Memory reduction factor: {mem_f / mem_lr:.2f}")
+
 
 # print timings
 print("Timings:")
