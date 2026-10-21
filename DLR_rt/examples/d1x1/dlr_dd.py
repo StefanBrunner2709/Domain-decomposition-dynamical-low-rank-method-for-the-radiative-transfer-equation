@@ -20,7 +20,10 @@ from DLR_rt.src.lr import (  # noqa: E402
     LR,
     add_basis_functions,
     computeF_b,
+    computeF_b_edges,
     drop_basis_functions,
+    first_row,
+    last_row,
 )
 from DLR_rt.src.util import mem_phase_end, mem_phase_start  # noqa: E402
 
@@ -35,6 +38,7 @@ def integrate(
     option: str = "lie",
     tol_sing_val: float = 1e-6,
     drop_tol: float = 1e-6,
+    F_b_method: str = "edges",
 ):
     lr_left = lr0_left
     lr_right = lr0_right
@@ -67,18 +71,27 @@ def integrate(
             ### Compute F_b
             t0 = perf_counter()
             m0 = mem_phase_start()
-            F_b_left = computeF_b(
-                t,
-                lr_left.U @ lr_left.S @ lr_left.V.T,
-                grid_left,
-                f_right=lr_right.U @ lr_right.S @ lr_right.V.T,
-            )
-            F_b_right = computeF_b(
-                t,
-                lr_right.U @ lr_right.S @ lr_right.V.T,
-                grid_right,
-                f_left=lr_left.U @ lr_left.S @ lr_left.V.T,
-            )
+            if F_b_method == "edges":
+                # Only these two rows are exchanged between the domains (MPI later)
+                F_b_left = computeF_b_edges(
+                    t, lr_left, grid_left, inflow_right=first_row(lr_right)
+                )
+                F_b_right = computeF_b_edges(
+                    t, lr_right, grid_right, inflow_left=last_row(lr_left)
+                )
+            elif F_b_method == "full":
+                F_b_left = computeF_b(
+                    t,
+                    lr_left.U @ lr_left.S @ lr_left.V.T,
+                    grid_left,
+                    f_right=lr_right.U @ lr_right.S @ lr_right.V.T,
+                )
+                F_b_right = computeF_b(
+                    t,
+                    lr_right.U @ lr_right.S @ lr_right.V.T,
+                    grid_right,
+                    f_left=lr_left.U @ lr_left.S @ lr_left.V.T,
+                )
             mem_phase_end(mem_peak, "F_b", m0)
             timings["F_b"] += perf_counter() - t0
 
@@ -171,6 +184,8 @@ if __name__ == "__main__":
     method = "lie"
     # tracemalloc slows the run down, so never use timings from a memory run
     measure_memory = False
+    # Compare computeF_b_edges against the old computeF_b (runs a second simulation)
+    run_edge_test = True
     # Repo root is three levels above this file, so the script works from any cwd
     savepath = Path(__file__).resolve().parents[3] / "plots"
     savepath.mkdir(parents=True, exist_ok=True)
@@ -227,6 +242,50 @@ if __name__ == "__main__":
     
     # save f object
     np.save(savepath / "det_check_dd.npy", f)
+
+    if run_edge_test:
+        print("\n### Test computeF_b_edges against computeF_b")
+
+        # Test 1: both functions on the same final state with a nonzero f
+        t_test = 0.5
+        diff_left = np.max(np.abs(
+            computeF_b(t_test, f_left, grid_left, f_right=f_right)
+            - computeF_b_edges(t_test, lr_left, grid_left,
+                               inflow_right=first_row(lr_right))
+        ))
+        diff_right = np.max(np.abs(
+            computeF_b(t_test, f_right, grid_right, f_left=f_left)
+            - computeF_b_edges(t_test, lr_right, grid_right,
+                               inflow_left=last_row(lr_left))
+        ))
+        print(f"Single F_b call, max abs difference left: {diff_left:.2e}, "
+              f"right: {diff_right:.2e}")
+        assert max(diff_left, diff_right) < 1e-14
+
+        # Test 2: whole simulation with the old function, same seed.
+        # integrate changes the lr objects and grids in place, so build them again.
+        np.random.seed(seed)
+        grid_ref_left, grid_ref_right = Grid_1x1d(Nx, Nmu, r).split()
+        lr0_ref_left = setInitialCondition_1x1d_lr(grid_ref_left)
+        lr0_ref_right = setInitialCondition_1x1d_lr(grid_ref_right)
+        lr_ref_left, lr_ref_right, _, _, _ = integrate(
+            lr0_ref_left, lr0_ref_right, grid_ref_left, grid_ref_right, t_f, dt,
+            option=method, tol_sing_val=1e-5, drop_tol=1e-5, F_b_method="full",
+        )
+        f_ref = np.concatenate((lr_ref_left.U @ lr_ref_left.S @ lr_ref_left.V.T,
+                                lr_ref_right.U @ lr_ref_right.S @ lr_ref_right.V.T),
+                               axis=0)
+        rel_diff = np.linalg.norm(f - f_ref) / np.linalg.norm(f_ref)
+        same_rank = (lr_left.S.shape == lr_ref_left.S.shape
+                     and lr_right.S.shape == lr_ref_right.S.shape)
+        print(f"Whole simulation, bit-identical: {np.array_equal(f, f_ref)}")
+        print(f"Whole simulation, relative difference: {rel_diff:.2e}")
+        print(f"Same final ranks (left, right): {same_rank}")
+        # Like in dlr_inflow: round-off differences in F_b are amplified by the
+        # rank truncation, so we expect agreement up to roughly the tolerance.
+        assert same_rank, "computeF_b_edges changes the final ranks!"
+        assert rel_diff < 1e-5, "computeF_b_edges changes the result!"
+        print("Test passed")
     
     
     im = axes.imshow(f.T, extent=extent, origin="lower", aspect=0.5)
