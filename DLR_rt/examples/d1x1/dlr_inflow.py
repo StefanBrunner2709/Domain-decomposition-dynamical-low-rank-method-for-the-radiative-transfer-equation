@@ -21,6 +21,7 @@ from DLR_rt.src.lr import (  # noqa: E402
     add_basis_functions,
     computeF_b,
     drop_basis_functions,
+    computeF_b_edges,
 )
 from DLR_rt.src.util import mem_phase_end, mem_phase_start  # noqa: E402
 
@@ -33,6 +34,7 @@ def integrate(
     option: str = "lie",
     tol_sing_val: float = 1e-6,
     drop_tol: float = 1e-6,
+    F_b_method: str = "edges",
 ):
     lr = lr0
     t = 0
@@ -60,7 +62,10 @@ def integrate(
             t0 = perf_counter()
             m0 = mem_phase_start()
 
-            F_b = computeF_b(t, lr.U @ lr.S @ lr.V.T, grid)
+            if F_b_method == "edges":
+                F_b = computeF_b_edges(t, lr, grid)
+            elif F_b_method == "full":
+                F_b = computeF_b(t, lr.U @ lr.S @ lr.V.T, grid)
 
             mem_phase_end(mem_peak, "F_b", m0)
             timings["F_b"] += perf_counter() - t0
@@ -149,11 +154,11 @@ def integrate(
 ### Just one plot for certain rank and certain time
 
 if __name__ == "__main__":
-    
+
     # Deterministic runs, remove np.random
     seed = 0
     np.random.seed(seed)
-    
+
     Nx = 256
     Nmu = 128
     dt = 1e-3
@@ -163,54 +168,85 @@ if __name__ == "__main__":
     method = "lie"
     # tracemalloc slows down the run --> so this can be activated here
     measure_memory = False
+    # Compare computeF_b_edges against the old computeF_b (runs a second simulation)
+    run_edge_test = True
     # Repo root is three levels above this file, so the script works from any cwd
     savepath = Path(__file__).resolve().parents[3] / "plots"
     savepath.mkdir(parents=True, exist_ok=True)
-    
+
     grid = Grid_1x1d(Nx, Nmu, r)
     lr0 = setInitialCondition_1x1d_lr(grid)
     f0 = lr0.U @ lr0.S @ lr0.V.T
     extent = [grid.X[0], grid.X[-1], grid.MU[0], grid.MU[-1]]
-    
+
     # Time measurement, only the time integration
     if measure_memory:
         tracemalloc.start()
-    
+
     t0 = perf_counter()
     lr, time, rank, timings, mem_peak = integrate(
         lr0, grid, t_f, dt, option=method, tol_sing_val=1e-7, drop_tol=1e-7
     )
     runtime = perf_counter() - t0
     print(f"Runtime: {runtime:.2f} seconds")
-    
+
     if measure_memory:
         tracemalloc.stop()
         print("Timings are distorted by tracemalloc in this run!")
         print("Peak additional memory per phase:")
         for key, value in mem_peak.items():
             print(f"{key}: {value / 1024:.1f} KB")
-    
+
     f = lr.U @ lr.S @ lr.V.T
-    
+
     # compute memory usage of f
     mem_lr = lr.U.nbytes + lr.S.nbytes + lr.V.nbytes
     mem_f = f.nbytes
     print(f"Memory usage of f: {mem_f / 1024**2:.2f} MB")
     print(f"Memory usage of low-rank representation: {mem_lr / 1024**2:.2f} MB")
     print(f"Memory reduction factor: {mem_f / mem_lr:.2f}")
-    
-    
+
+
     # print timings
     print("Timings:")
     for key, value in timings.items():
         print(f"{key}: {value:.2f} seconds")
-    
+
     # Save f object
     np.save(savepath / "det_check_inflow.npy", f)
-    
-    
+
+    if run_edge_test:
+        print("\n### Test computeF_b_edges against computeF_b")
+
+        # Test 1: both functions on the same final state with a nonzero f
+        t_test = 0.5
+        F_b_full = computeF_b(t_test, f, grid)
+        F_b_edges = computeF_b_edges(t_test, lr, grid)
+        diff_F_b = np.max(np.abs(F_b_full - F_b_edges))
+        print(f"Single F_b call, max abs difference: {diff_F_b:.2e}")
+        assert np.allclose(F_b_full, F_b_edges, rtol=1e-12, atol=1e-14)
+
+        # Test 2: whole simulation with the old function, same seed.
+        # integrate changes lr0 and grid in place, so both are built again.
+        np.random.seed(seed)
+        grid_ref = Grid_1x1d(Nx, Nmu, r)
+        lr0_ref = setInitialCondition_1x1d_lr(grid_ref)
+        lr_ref, _, rank_ref, _, _ = integrate(
+            lr0_ref, grid_ref, t_f, dt, option=method,
+            tol_sing_val=1e-7, drop_tol=1e-7, F_b_method="full",
+        )
+        f_ref = lr_ref.U @ lr_ref.S @ lr_ref.V.T
+        rel_diff = np.linalg.norm(f - f_ref) / np.linalg.norm(f_ref)
+        print(f"Whole simulation, bit-identical: {np.array_equal(f, f_ref)}")
+        print(f"Whole simulation, relative difference: {rel_diff:.2e}")
+        print(f"Same rank history: {rank == rank_ref}")
+        assert rank == rank_ref, "computeF_b_edges changes the rank history!"
+        assert rel_diff < 1e-5, "computeF_b_edges changes the result!"
+        print("Test passed")
+
+
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
-    
+
     im = ax1.imshow(f.T, extent=extent, origin='lower', aspect=0.5)
     # im = ax1.imshow(f.T, extent=extent, origin="lower", aspect=0.5, vmin=0.0, vmax=1.0)
     ax1.set_xlabel("$x$", fontsize=fs)
@@ -219,13 +255,13 @@ if __name__ == "__main__":
     ax1.set_yticks([-1, 0, 1])
     ax1.tick_params(axis="both", labelsize=fs, pad=20)
     ax1.set_title(r"$f(t,x,\mu)$", fontsize=fs)
-    
+
     cbar_fixed = fig.colorbar(im, ax=ax1, shrink=1)
     # cbar_fixed.set_ticks([np.ceil(np.min(f)*10000)/10000,
     #                       np.floor(np.max(f)*10000)/10000])
     cbar_fixed.set_ticks([np.min(f), np.max(f)])
     cbar_fixed.ax.tick_params(labelsize=fs)
-    
+
     ax2.plot(time, rank)
     ax2.set_xlabel("$t$", fontsize=22)
     ax2.set_ylabel("rank $r(t)$", fontsize=22)
@@ -234,6 +270,6 @@ if __name__ == "__main__":
     ax2.set_xticks([0, 1, 2])
     ax2.margins(x=0)
     ax2.set_xlim(0, 2)
-    
+
     plt.tight_layout()
     plt.savefig(savepath / ("distr_funct_adapt_rank_t" + str(t_f) + ".pdf"))

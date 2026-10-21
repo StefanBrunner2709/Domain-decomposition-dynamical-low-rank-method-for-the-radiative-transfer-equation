@@ -93,8 +93,66 @@ def computeF_b(t: float, f, grid, f_left=None, f_right=None):
 
     return F_b
 
+def computeF_b_edges(t: float, lr, grid, inflow_left=None, inflow_right=None):
+    """  
+    Generate discretization of inflow/outflow boundary from the edge values
 
-def computeF_b_2x1d_X(f, grid, f_left=None, f_right=None, f_periodic=None, 
+    Should give the same result as the computeF_b function, but only needs the
+    edge rows of the neighbours instead of their full matrices. 
+    This will later on be the data that has to be exchanged between subdomains (MPI)
+
+    inflow_left/inflow_right is None, the boundary value tanh(t) is used on that side
+
+    Params:
+
+    t: float
+        Current time.
+    lr: LR
+        Low rank structure.
+    grid:
+        Grid class of subdomain
+    inflow_left: np.ndarray
+        Edge values of the left subdomain, shape (nmu,)
+    inflow_right: np.ndarray
+        Edge values of the right subdomain, shape (nmu,)
+    """
+    # Only the 4 rows of 4 are needed for the extrapolation, without building full f
+    rows = lr.U[[0, 1, -2, -1], :] @ lr.S @ lr.V.T # shape (4, nmu)
+
+    if inflow_left is None:
+        # initialize boundary condition tanh(t)
+        inflow_left = np.full(grid.Nmu, np.tanh(t)) 
+    if inflow_right is None:
+        # initialize boundary condition tanh(t)
+        inflow_right = np.full(grid.Nmu, np.tanh(t))
+    
+    # Split the rows into left and right parts
+    pos = grid.MU > 0
+    neg = grid.MU < 0
+
+    F_b = np.zeros((2, grid.Nmu)) # initialize the boundary matrix
+    # Note that entries with mu==0 stay 0 similar to computeF_b function
+    F_b[0, pos] = inflow_left[pos] # inflow from the left
+    F_b[0, neg] = 2 * rows[0, neg] - rows[1, neg] # outflow extrapolation
+    F_b[1, pos] = 2 * rows[3, pos] - rows[2, pos] # outflow extrapolation
+    F_b[1, neg] = inflow_right[neg] # inflow from the right
+
+    return F_b
+
+def first_row(lr):
+    """ 
+    Values of f at the first spatial grid point -> send to left neighbour
+    """
+    return lr.U[0, :] @ lr.S @ lr.V.T
+
+def last_row(lr):
+    """ 
+    Values of f at the last spatial grid point -> send to right neighbour
+    """
+    return lr.U[-1, :] @ lr.S @ lr.V.T
+
+
+def computeF_b_2x1d_X(f, grid, f_left=None, f_right=None, f_periodic=None,
                       grid_left=None, grid_right=None, option_bc="standard"):
     """
     Generate discretization of 2x1d full X boundary.
