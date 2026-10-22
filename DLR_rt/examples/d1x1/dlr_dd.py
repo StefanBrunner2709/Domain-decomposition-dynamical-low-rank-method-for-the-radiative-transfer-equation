@@ -45,8 +45,9 @@ def integrate(
     t = 0
     time = []
     time.append(t)
-    # adapt_rank = []
-    # adapt_rank.append(grid.r)
+    # Rank history per subdomain, one entry per time step
+    rank_left = [grid_left.r]
+    rank_right = [grid_right.r]
 
     # Timings, F_b covers both domains since it becomes the exchange in MPI
     timings = {
@@ -72,7 +73,8 @@ def integrate(
             t0 = perf_counter()
             m0 = mem_phase_start()
             if F_b_method == "edges":
-                # Only these two rows are exchanged between the domains (MPI later)
+                # Only two rows need to be interchanged between the domains,
+                # TODO this will be the later MPI communication 
                 F_b_left = computeF_b_edges(
                     t, lr_left, grid_left, inflow_right=first_row(lr_right)
                 )
@@ -162,9 +164,10 @@ def integrate(
             t += dt
             time.append(t)
 
-            # adapt_rank.append(grid.r)
+            rank_left.append(grid_left.r)
+            rank_right.append(grid_right.r)
 
-    return lr_left, lr_right, time, timings, mem_peak
+    return lr_left, lr_right, time, rank_left, rank_right, timings, mem_peak
 
 
 ### Just one plot for certain rank and certain time
@@ -201,7 +204,7 @@ if __name__ == "__main__":
     if measure_memory:
         tracemalloc.start()
     t0 = perf_counter()
-    lr_left, lr_right, time, timings, mem_peak = integrate(
+    lr_left, lr_right, time, rank_left, rank_right, timings, mem_peak = integrate(
         lr0_left,
         lr0_right,
         grid_left,
@@ -243,6 +246,25 @@ if __name__ == "__main__":
     # save f object
     np.save(savepath / "det_check_dd.npy", f)
 
+    # Rank history per subdomain
+    print(f"Rank left:  min {min(rank_left)}, max {max(rank_left)}, "
+          f"mean {np.mean(rank_left):.2f}")
+    print(f"Rank right: min {min(rank_right)}, max {max(rank_right)}, "
+          f"mean {np.mean(rank_right):.2f}")
+    np.savez(savepath / "dd_rank_history.npz",
+             time=time, rank_left=rank_left, rank_right=rank_right)
+
+    fig_rank, ax_rank = plt.subplots(figsize=(8, 5))
+    ax_rank.plot(time, rank_left, label="left domain")
+    ax_rank.plot(time, rank_right, label="right domain")
+    ax_rank.set_xlabel("$t$", fontsize=fs)
+    ax_rank.set_ylabel("rank $r(t)$", fontsize=fs)
+    ax_rank.tick_params(axis="both", labelsize=fs)
+    ax_rank.margins(x=0)
+    ax_rank.legend(fontsize=fs * 0.6)
+    fig_rank.tight_layout()
+    fig_rank.savefig(savepath / ("dd_rank_history_t" + str(t_f) + ".pdf"))
+
     if run_edge_test:
         print("\n### Test computeF_b_edges against computeF_b")
 
@@ -268,7 +290,7 @@ if __name__ == "__main__":
         grid_ref_left, grid_ref_right = Grid_1x1d(Nx, Nmu, r).split()
         lr0_ref_left = setInitialCondition_1x1d_lr(grid_ref_left)
         lr0_ref_right = setInitialCondition_1x1d_lr(grid_ref_right)
-        lr_ref_left, lr_ref_right, _, _, _ = integrate(
+        lr_ref_left, lr_ref_right, _, rank_ref_left, rank_ref_right, _, _ = integrate(
             lr0_ref_left, lr0_ref_right, grid_ref_left, grid_ref_right, t_f, dt,
             option=method, tol_sing_val=1e-5, drop_tol=1e-5, F_b_method="full",
         )
@@ -276,14 +298,19 @@ if __name__ == "__main__":
                                 lr_ref_right.U @ lr_ref_right.S @ lr_ref_right.V.T),
                                axis=0)
         rel_diff = np.linalg.norm(f - f_ref) / np.linalg.norm(f_ref)
-        same_rank = (lr_left.S.shape == lr_ref_left.S.shape
-                     and lr_right.S.shape == lr_ref_right.S.shape)
+        same_rank = rank_left == rank_ref_left and rank_right == rank_ref_right
         print(f"Whole simulation, bit-identical: {np.array_equal(f, f_ref)}")
         print(f"Whole simulation, relative difference: {rel_diff:.2e}")
-        print(f"Same final ranks (left, right): {same_rank}")
+        print(f"Same rank history (left, right): {same_rank}")
+        if not same_rank:
+            # First time step where one of the truncation decisions differs
+            n = next(i for i in range(len(rank_left))
+                     if rank_left[i] != rank_ref_left[i]
+                     or rank_right[i] != rank_ref_right[i])
+            print(f"Rank history differs first at step {n}, t = {time[n]:.3f}")
         # Like in dlr_inflow: round-off differences in F_b are amplified by the
         # rank truncation, so we expect agreement up to roughly the tolerance.
-        assert same_rank, "computeF_b_edges changes the final ranks!"
+        assert same_rank, "computeF_b_edges changes the rank history!"
         assert rel_diff < 1e-5, "computeF_b_edges changes the result!"
         print("Test passed")
     

@@ -37,7 +37,7 @@ def time_per_step(Nx, Nmu=128, tol=1e-5, n_domains=1):
             g_l, g_r = grid.split()
             lr_l, lr_r = setInitialCondition_1x1d_lr(g_l), setInitialCondition_1x1d_lr(g_r)
             t0 = perf_counter()
-            _, _, time, _, _ = dlr_dd.integrate(
+            _, _, time, _, _, _, _ = dlr_dd.integrate(
                 lr_l, lr_r, g_l, g_r, T_F, dt, tol_sing_val=tol, drop_tol=tol
             )
 
