@@ -13,6 +13,7 @@ dependencies = [
   "matplotlib",
   "tqdm",
   "scipy",
+  "mpi4py",
 ]
 requires-python = ">=3.10"
 classifiers = []

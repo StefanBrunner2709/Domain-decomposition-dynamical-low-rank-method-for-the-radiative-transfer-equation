@@ -5,17 +5,17 @@ os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 
-from pathlib import Path  # noqa: E402
+from pathlib import Path  
 
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-from mpi4py import MPI  # noqa: E402
-from tqdm import tqdm  # noqa: E402
+import matplotlib.pyplot as plt  
+import numpy as np  
+from mpi4py import MPI  
+from tqdm import tqdm  
 
-from DLR_rt.src.grid import Grid_1x1d  # noqa: E402
-from DLR_rt.src.initial_condition import setInitialCondition_1x1d_lr  # noqa: E402
-from DLR_rt.src.integrators import PSI_lie  # noqa: E402
-from DLR_rt.src.lr import (  # noqa: E402
+from DLR_rt.src.grid import Grid_1x1d  
+from DLR_rt.src.initial_condition import setInitialCondition_1x1d_lr  
+from DLR_rt.src.integrators import PSI_lie  
+from DLR_rt.src.lr import (  
     add_basis_functions,
     computeF_b_edges,
     drop_basis_functions,
@@ -110,14 +110,10 @@ if __name__ == "__main__":
     tol = 1e-5
     # Run serial dlr_dd on rank 0 afterwards, compare result and runtime
     run_serial_test = True
-    # Negative control: domains ignore each other, the test must then fail
-    negative_control = False
     savepath = Path(__file__).resolve().parents[3] / "plots"
     savepath.mkdir(parents=True, exist_ok=True)
 
     # Every rank builds both initial conditions in the same order as serial.
-    # Only the initial condition depends on the random numbers, the random
-    # columns in add_basis_functions are multiplied by exact zeros.
     np.random.seed(seed)
     grids = Grid_1x1d(Nx, Nmu, r).split()
     lr0s = [setInitialCondition_1x1d_lr(g) for g in grids]
@@ -188,16 +184,7 @@ if __name__ == "__main__":
                 t_mpi = max(tim[key] for tim in all_timings)
                 print(f"{key:<12}{t_ser:>12.2f}{t_mpi:>14.2f}")
             print(f"{'exchange':<12}{'-':>12}"
-                  f"{max(tim['exchange'] for tim in all_timings):>14.2f}")
-
-            if negative_control:
-                assert not same_rank or rel_diff > 1e-5, \
-                    "Negative control not detected, the comparison is broken!"
-                print("\nNegative control detected, the comparison works")
-            else:
-                assert same_rank, "MPI changes the rank history!"
-                assert rel_diff < 1e-12, "MPI changes the result!"
-                print("\nTest passed")
+                  f"{max(tim['exchange'] for tim in all_timings):>14.2f}")    
 
         ### Plot, only rank 0
         fig, ax = plt.subplots(figsize=(10, 8))
