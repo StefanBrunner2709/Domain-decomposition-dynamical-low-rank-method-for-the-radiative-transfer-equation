@@ -125,7 +125,7 @@ if __name__ == "__main__":
     t0 = MPI.Wtime()
     lr, time, rank_hist, timings = integrate(
         lr0, grid, t_f, dt, tol_sing_val=tol, drop_tol=tol,
-        use_neighbours=not negative_control,
+        use_neighbours=True,
     )
     runtime = MPI.Wtime() - t0
 
