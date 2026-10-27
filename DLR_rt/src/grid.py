@@ -4,7 +4,6 @@ Contains classes to set up grid.
 
 import numpy as np
 
-
 class Grid_1x1d:
     """
     Generate 1x1 dimensional grid.
@@ -120,7 +119,18 @@ class Grid_1x1d:
         assert len(_coeffs) == n_split, "Length of _coeffs must match n_split"
         # dx is computed as X[1] - X[0] so every subdomain needs at least 2 grid points
         assert self.Nx >= 2 * n_split, "Nx must be at least 2 * n_split"
-        
+
+        # array_split givers the first Nx % n_split parts
+        X_parts = np.array_split(self.X, n_split)
+
+
+        return [
+            Grid_1x1d(len(X_i), self.Nmu, self.r, _X=X_i, _coeff=coeff_i)
+                      for X_i, coeff_i in zip(X_parts, _coeffs)
+        ]
+
+    
+
 
 
 class Grid_2x1d:
