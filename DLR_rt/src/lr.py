@@ -1656,7 +1656,7 @@ def Lstep3(L, B1, grid, lr, source=None):
 
 
 def add_basis_functions(
-    lr, grid, F_b, tol_sing_val, dimensions="1x1d"
+    lr, grid, F_b, tol_sing_val, dimensions="1x1d", rng=None
 ):
     """
     Add basis functions.
@@ -1677,8 +1677,12 @@ def add_basis_functions(
         Tolerance for singular values.
     dimensions
         Can be chosen "1x1d" or "2x1d".
+    rng
+        np.random.Generator for the random basis functions X_h. If None, the
+        global np.random state is used. Give every subdomain its own generator,
+        so that serial and MPI runs draw the same numbers per subdomain.
     """
-    # ToDo: Check if scaling here is correct 
+    # ToDo: Check if scaling here is correct
     # (not checked yet because I mainly use v2 now)
 
     # Compute SVD and drop singular values
@@ -1713,9 +1717,13 @@ def add_basis_functions(
 
     # Concatenate
     if dimensions == "1x1d":
-        X_h = np.random.rand(grid.Nx, r_b)
+        n_rows = grid.Nx
     elif dimensions == "2x1d":
-        X_h = np.random.rand(grid.Nx * grid.Ny, r_b)
+        n_rows = grid.Nx * grid.Ny
+    if rng is None:
+        X_h = np.random.rand(n_rows, r_b)
+    else:
+        X_h = rng.random((n_rows, r_b))
     lr.U = np.concatenate((lr.U, X_h), axis=1)
     lr.V = np.concatenate((lr.V, Q), axis=1)
     S_extended = np.zeros((grid.r + r_b, grid.r + r_b))

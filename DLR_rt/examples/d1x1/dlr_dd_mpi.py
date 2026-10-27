@@ -37,10 +37,16 @@ right_nb = rank + 1 if rank < size - 1 else MPI.PROC_NULL
 
 
 def integrate(lr, grid, t_f, dt, tol_sing_val=1e-6, drop_tol=1e-6,
-              use_neighbours=True):
+              use_neighbours=True, rng=None, snapshots=None, snap_every=10):
+    # rng: np.random.Generator of this subdomain for add_basis_functions.
+    # Seed it like the serial dlr_dd with [seed, rank] to get identical results.
+    # snapshots: if a list is given, (t, local f) is appended every snap_every steps
     t = 0
+    step = 0
     time = [t]
     rank_hist = [grid.r]
+    if snapshots is not None:
+        snapshots.append((t, lr.U @ lr.S @ lr.V.T))
     timings = {"exchange": 0.0, "F_b": 0.0, "add_basis": 0.0,
                "PSI": 0.0, "drop_basis": 0.0}
 
@@ -80,7 +86,7 @@ def integrate(lr, grid, t_f, dt, tol_sing_val=1e-6, drop_tol=1e-6,
 
             # Local update same as in serial version
             t0 = MPI.Wtime()
-            lr, grid = add_basis_functions(lr, grid, F_b, tol_sing_val)
+            lr, grid = add_basis_functions(lr, grid, F_b, tol_sing_val, rng=rng)
             timings["add_basis"] += MPI.Wtime() - t0
 
             t0 = MPI.Wtime()
@@ -92,8 +98,11 @@ def integrate(lr, grid, t_f, dt, tol_sing_val=1e-6, drop_tol=1e-6,
             timings["drop_basis"] += MPI.Wtime() - t0
 
             t += dt
+            step += 1
             time.append(t)
             rank_hist.append(grid.r)
+            if snapshots is not None and (step % snap_every == 0 or t >= t_f):
+                snapshots.append((t, lr.U @ lr.S @ lr.V.T))
 
     return lr, time, rank_hist, timings
 
@@ -125,7 +134,7 @@ if __name__ == "__main__":
     t0 = MPI.Wtime()
     lr, time, rank_hist, timings = integrate(
         lr0, grid, t_f, dt, tol_sing_val=tol, drop_tol=tol,
-        use_neighbours=True,
+        use_neighbours=True, rng=np.random.default_rng([seed, rank]),
     )
     runtime = MPI.Wtime() - t0
 
@@ -156,7 +165,9 @@ if __name__ == "__main__":
 
             t0 = MPI.Wtime()
             lr_l, lr_r, _, rank_l, rank_r, timings_ser, _ = dlr_dd.integrate(
-                lr_l, lr_r, g_l, g_r, t_f, dt, tol_sing_val=tol, drop_tol=tol
+                lr_l, lr_r, g_l, g_r, t_f, dt, tol_sing_val=tol, drop_tol=tol,
+                rng_left=np.random.default_rng([seed, 0]),
+                rng_right=np.random.default_rng([seed, 1]),
             )
             runtime_ser = MPI.Wtime() - t0
 

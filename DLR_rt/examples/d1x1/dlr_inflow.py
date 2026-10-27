@@ -35,9 +35,17 @@ def integrate(
     tol_sing_val: float = 1e-6,
     drop_tol: float = 1e-6,
     F_b_method: str = "edges",
+    rng=None,
+    snapshots=None,
+    snap_every: int = 10,
 ):
+    # rng: np.random.Generator for add_basis_functions, None uses np.random
+    # snapshots: if a list is given, (t, f) is appended every snap_every steps
     lr = lr0
     t = 0
+    step = 0
+    if snapshots is not None:
+        snapshots.append((t, lr.U @ lr.S @ lr.V.T))
     time = []
     time.append(t)
     adapt_rank = []
@@ -75,7 +83,7 @@ def integrate(
             t0 = perf_counter()
             m0 = mem_phase_start()
 
-            lr, grid = add_basis_functions(lr, grid, F_b, tol_sing_val)
+            lr, grid = add_basis_functions(lr, grid, F_b, tol_sing_val, rng=rng)
 
             mem_phase_end(mem_peak, "add_basis", m0)
             timings["add_basis"] += perf_counter() - t0
@@ -98,9 +106,13 @@ def integrate(
             timings["drop_basis"] += perf_counter() - t0
 
             t += dt
+            step += 1
             time.append(t)
 
             adapt_rank.append(grid.r)
+
+            if snapshots is not None and (step % snap_every == 0 or t >= t_f):
+                snapshots.append((t, lr.U @ lr.S @ lr.V.T))
 
             # ### Do the plotting for video
 

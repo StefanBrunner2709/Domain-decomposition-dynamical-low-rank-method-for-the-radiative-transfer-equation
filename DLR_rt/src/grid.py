@@ -99,6 +99,29 @@ class Grid_1x1d:
 
         return left_grid, right_grid
 
+    def split_n(self, n_split: int, _coeffs=None):
+        """
+        Split domain into n_split subdomains.
+
+        Split the domain into n_split subdomains along the X grid.
+        If Nx is not divisible by n_split, the first subdomains get one grid point more
+
+        Parameters
+        ----------
+        n_split:
+            Number of subdomains, e.g the number of MPI ranks
+        _coeffs:
+            List of 1/epsilon for radiative transfer equation on each subdomain. 
+            If None, value from whole domain is taken.
+        """
+        if _coeffs is None:
+            _coeffs = [self.coeff] * n_split
+
+        assert len(_coeffs) == n_split, "Length of _coeffs must match n_split"
+        # dx is computed as X[1] - X[0] so every subdomain needs at least 2 grid points
+        assert self.Nx >= 2 * n_split, "Nx must be at least 2 * n_split"
+        
+
 
 class Grid_2x1d:
     """

@@ -39,10 +39,23 @@ def integrate(
     tol_sing_val: float = 1e-6,
     drop_tol: float = 1e-6,
     F_b_method: str = "edges",
+    rng_left=None,
+    rng_right=None,
+    snapshots=None,
+    snap_every: int = 10,
 ):
+    # One np.random.Generator per subdomain for add_basis_functions, so that
+    # the random numbers do not depend on the order in which domains are updated
+    # (needed to compare with the MPI version). None uses the global np.random.
+    # snapshots: if a list is given, (t, f on the whole domain) is appended
+    # every snap_every steps
     lr_left = lr0_left
     lr_right = lr0_right
     t = 0
+    step = 0
+    if snapshots is not None:
+        snapshots.append((t, np.concatenate((lr_left.U @ lr_left.S @ lr_left.V.T,
+                                             lr_right.U @ lr_right.S @ lr_right.V.T))))
     time = []
     time.append(t)
     # Rank history per subdomain, one entry per time step
@@ -103,7 +116,7 @@ def integrate(
             t0 = perf_counter()
             m0 = mem_phase_start()
             lr_left, grid_left = add_basis_functions(
-                lr_left, grid_left, F_b_left, tol_sing_val
+                lr_left, grid_left, F_b_left, tol_sing_val, rng=rng_left
             )
             mem_phase_end(mem_peak, "add_basis_left", m0)
             timings["add_basis_left"] += perf_counter() - t0
@@ -133,7 +146,7 @@ def integrate(
             t0 = perf_counter()
             m0 = mem_phase_start()
             lr_right, grid_right = add_basis_functions(
-                lr_right, grid_right, F_b_right, tol_sing_val
+                lr_right, grid_right, F_b_right, tol_sing_val, rng=rng_right
             )
             mem_phase_end(mem_peak, "add_basis_right", m0)
             timings["add_basis_right"] += perf_counter() - t0
@@ -162,10 +175,16 @@ def integrate(
 
             # Update time
             t += dt
+            step += 1
             time.append(t)
 
             rank_left.append(grid_left.r)
             rank_right.append(grid_right.r)
+
+            if snapshots is not None and (step % snap_every == 0 or t >= t_f):
+                snapshots.append((t, np.concatenate(
+                    (lr_left.U @ lr_left.S @ lr_left.V.T,
+                     lr_right.U @ lr_right.S @ lr_right.V.T))))
 
     return lr_left, lr_right, time, rank_left, rank_right, timings, mem_peak
 
@@ -214,6 +233,8 @@ if __name__ == "__main__":
         option=method,
         tol_sing_val=1e-5,
         drop_tol=1e-5,
+        rng_left=np.random.default_rng([seed, 0]),
+        rng_right=np.random.default_rng([seed, 1]),
     )
     runtime = perf_counter() - t0
     print(f"Runtime: {runtime:.2f} seconds")
@@ -293,6 +314,8 @@ if __name__ == "__main__":
         lr_ref_left, lr_ref_right, _, rank_ref_left, rank_ref_right, _, _ = integrate(
             lr0_ref_left, lr0_ref_right, grid_ref_left, grid_ref_right, t_f, dt,
             option=method, tol_sing_val=1e-5, drop_tol=1e-5, F_b_method="full",
+            rng_left=np.random.default_rng([seed, 0]),
+            rng_right=np.random.default_rng([seed, 1]),
         )
         f_ref = np.concatenate((lr_ref_left.U @ lr_ref_left.S @ lr_ref_left.V.T,
                                 lr_ref_right.U @ lr_ref_right.S @ lr_ref_right.V.T),
