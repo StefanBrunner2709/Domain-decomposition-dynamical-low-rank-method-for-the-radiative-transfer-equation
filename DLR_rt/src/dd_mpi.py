@@ -162,43 +162,38 @@ def timings_per_rank(res: RunResult) -> list[dict]:
 
 
 if __name__ == "__main__":
-    # Check against integrate_serial with the same number of domains
+    # Check against integrate_serial, used by test_mpi_matches_serial.
+    # Run: mpirun -n 4 python -m DLR_rt.src.dd_mpi 8   (8 domains, default: 1 per rank)
     import sys
 
     from DLR_rt.src.dd_1x1d import integrate_serial, setup_domains
 
     comm = MPI.COMM_WORLD
     rank, size = comm.Get_rank(), comm.Get_size()
-
-    Nx, Nmu, r, t_f, dt, tol, seed = 256, 64, 5, 0.2, 1e-3, 1e-5, 0
     n_domains = int(sys.argv[1]) if len(sys.argv) > 1 else size
+    setup = dict(Nx=256, Nmu=64, r=5, n_domains=n_domains, seed=0)
+    run = dict(t_f=0.2, dt=1e-3, tol_sing_val=1e-5, drop_tol=1e-5, snap_every=10)
 
-    grids, lr0s, rngs = setup_domains(Nx, Nmu, r, n_domains, seed)
+    grids, lr0s, rngs = setup_domains(**setup)
     mine = domain_slice(n_domains, comm)
     comm.Barrier()
-    local = integrate_mpi(lr0s[mine], grids[mine], rngs[mine], t_f, dt, comm,
-                          tol, tol, snap_every=10)
+    local = integrate_mpi(lr0s[mine], grids[mine], rngs[mine], comm=comm, **run)
     res = gather_result(comm, local)
 
     if rank == 0:
-        grids, lr0s, rngs = setup_domains(Nx, Nmu, r, n_domains, seed)
-        ser = integrate_serial(lr0s, grids, rngs, t_f, dt, tol, tol, snap_every=10)
+        grids, lr0s, rngs = setup_domains(**setup)
+        ser = integrate_serial(lr0s, grids, rngs, **run)
 
-        identical = np.array_equal(res.f(), ser.f())
-        same_snaps = (len(res.snap_f) == len(ser.snap_f) and all(
-            np.array_equal(a, b) for a, b in zip(res.snap_f, ser.snap_f)))
-        speedup = ser.runtime / res.runtime
-        print(f"\n{size} ranks, {n_domains} domains vs serial:")
-        print(f"  domains per rank:        {[res.owner.count(i) for i in range(size)]}")
-        print(f"  bit-identical f:         {identical}")
-        print(f"  bit-identical snapshots: {same_snaps}")
-        print(f"  same rank history:       {res.rank_hist == ser.rank_hist}")
-        print(f"  final ranks:             {[h[-1] for h in res.rank_hist]}")
-        print(f"  serial {ser.runtime:.2f} s, MPI {res.runtime:.2f} s, "
-              f"speedup {speedup:.2f}, efficiency {speedup / size * 100:.0f} %")
+        identical = (np.array_equal(res.f(), ser.f())
+                     and len(res.snap_f) == len(ser.snap_f)
+                     and all(map(np.array_equal, res.snap_f, ser.snap_f))
+                     and res.rank_hist == ser.rank_hist)
+        print(f"\n{size} ranks, {n_domains} domains "
+              f"{[res.owner.count(i) for i in range(size)]}, "
+              f"bit-identical to serial: {identical}, "
+              f"speedup {ser.runtime / res.runtime:.2f}")
         for i, tim in enumerate(timings_per_rank(res)):
             print(f"  rank {i}: " + ", ".join(f"{k} {v:.2f} s" for k, v in tim.items()))
 
-        assert identical and same_snaps
-        assert res.rank_hist == ser.rank_hist
+        assert identical
         print("All checks passed")

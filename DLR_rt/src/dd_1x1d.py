@@ -273,48 +273,9 @@ def integrate_serial(lrs: list[LR], grids: list[Grid_1x1d], rngs: list,
 
 
 if __name__ == "__main__":
-    # Quick check against the old scripts, everything has to be bit-identical.
-    # Run: python -m DLR_rt.src.dd_1x1d
-    from DLR_rt.examples.d1x1 import dlr_dd, dlr_inflow
-
-    Nx, Nmu, r, t_f, dt, tol, seed = 128, 64, 5, 0.2, 1e-3, 1e-5, 0
-
-    # 2 domains against dlr_dd
-    grids, lr0s, rngs = setup_domains(Nx, Nmu, r, 2, seed)
-    res = integrate_serial(lr0s, grids, rngs, t_f, dt, tol, tol, snap_every=10)
-
-    grids, lr0s, rngs = setup_domains(Nx, Nmu, r, 2, seed)
-    lr_l, lr_r, _, rank_l, rank_r, _, _ = dlr_dd.integrate(
-        lr0s[0], lr0s[1], grids[0], grids[1], t_f, dt,
-        tol_sing_val=tol, drop_tol=tol, rng_left=rngs[0], rng_right=rngs[1],
-    )
-    f_old = np.concatenate((full_f(lr_l), full_f(lr_r)), axis=0)
-    print(f"2 domains vs dlr_dd:     bit-identical {np.array_equal(res.f(), f_old)}, "
-          f"same rank history {res.rank_hist == [rank_l, rank_r]}")
-    assert np.array_equal(res.f(), f_old)
-    assert res.rank_hist == [rank_l, rank_r]
-    assert np.array_equal(res.snap_f[-1], res.f())
-
-    # 1 domain against dlr_inflow
-    grids, lr0s, rngs = setup_domains(Nx, Nmu, r, 1, seed)
-    res1 = integrate_serial(lr0s, grids, rngs, t_f, dt, tol, tol)
-
-    grids, lr0s, rngs = setup_domains(Nx, Nmu, r, 1, seed)
-    lr, _, adapt_rank, _, _ = dlr_inflow.integrate(
-        lr0s[0], grids[0], t_f, dt, tol_sing_val=tol, drop_tol=tol, rng=rngs[0],
-    )
-    print(f"1 domain vs dlr_inflow:  bit-identical {np.array_equal(res1.f(), full_f(lr))}, "
-          f"same rank history {res1.rank_hist == [adapt_rank]}")
-    assert np.array_equal(res1.f(), full_f(lr))
-    assert res1.rank_hist == [adapt_rank]
-
-    
-    grids, lr0s, rngs = setup_domains(Nx, Nmu, r, 4, seed)
-    res4 = integrate_serial(lr0s, grids, rngs, t_f, dt, tol, tol)
-    rel = np.linalg.norm(res4.f() - res1.f()) / np.linalg.norm(res1.f())
-    print(f"4 domains vs 1 domain:   rel. L2 difference {rel:.2e} (DD error)")
-    print(f"4 domains, final ranks:  {[h[-1] for h in res4.rank_hist]}")
-    for i, tim in enumerate(res4.timings):
-        print(f"  domain {i}: " + ", ".join(f"{k} {v:.2f} s" for k, v in tim.items()))
-
-    print("All checks passed")
+    # Short demo, the checks are in DLR_rt/tests/test_dd_1x1d.py
+    grids, lr0s, rngs = setup_domains(Nx=256, Nmu=64, r=5, n_domains=4, seed=0)
+    res = integrate_serial(lr0s, grids, rngs, t_f=0.2, dt=1e-3,
+                           tol_sing_val=1e-5, drop_tol=1e-5)
+    print(f"{res.n_domains} domains, runtime {res.runtime:.2f} s, "
+          f"final ranks {[h[-1] for h in res.rank_hist]}")
