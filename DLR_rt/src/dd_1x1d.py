@@ -71,6 +71,8 @@ class RunResult:
     snap_t: list[float] = field(default_factory=list)  # time of each snapshot
     snap_f: list[np.ndarray] = field(default_factory=list)  # f at each snapshot
     runtime: float = 0.0  # wall time of the time loop in seconds
+    owner: list[int] = field(default_factory=list)  # MPI: [domain] -> rank
+    rank_timings: list[dict] = field(default_factory=list)  # MPI: [rank] -> exchange
 
     @property
     def n_domains(self) -> int:
@@ -112,6 +114,19 @@ def setup_domains(Nx: int, Nmu: int, r: int, n_domains: int, seed: int = 0,
     Every subdomain is built, in the MPI version on every rank, so that the initial
     condition does not depend on the number of ranks.
 
+    Parameters
+    ----------
+    Nx : int
+        Number of x grid points in the full domain.
+    Nmu : int
+        Number of mu grid points in the full domain.
+    r : int
+        Initial rank of the low-rank objects.
+    n_domains : int
+        Number of subdomains to split the full domain into.
+    seed : int
+        Seed for the global random generator, used for the initial condition.
+    
     Returns
     -------
     grids, lr0s, rngs
@@ -150,6 +165,42 @@ def local_step(lr: LR, grid: Grid_1x1d, F_b: np.ndarray, t: float, dt: float,
         lr, grid = drop_basis_functions(lr, grid, drop_tol)
 
     return lr, grid
+
+def block_step(lrs: list[LR], grids: list[Grid_1x1d], rngs: list,
+               timers: list[PhaseTimer], t: float, dt: float,
+               tol_sing_val: float, drop_tol: float, option: str = "lie",
+               use_neighbours: bool = True,
+               outer_left: np.ndarray | None = None,
+               outer_right: np.ndarray | None = None):
+    """
+    One time step on a block of neighbouring subdomains, ordered left to right.
+
+    Serial: the block is the whole domain, outer_left/outer_right are None.
+    MPI: the block is the part of one rank, outer_left/outer_right are the rows
+    received from the neighbouring ranks (None at the physical boundary).
+    lrs and grids are updated in place.
+    """
+    n = len(lrs)
+
+    # 1) Get boundary values of all domains, from the state before the step
+    # Inside the block the rows come from neighbouring lr
+    F_bs = []
+    for i in range(n):
+        with timers[i]("F_b"):
+            if use_neighbours:
+                inflow_left = last_row(lrs[i - 1]) if i > 0 else outer_left
+                inflow_right = first_row(lrs[i + 1]) if i < n - 1 else outer_right
+            else:
+                inflow_left = inflow_right = None
+            F_bs.append(computeF_b_edges(t, lrs[i], grids[i],
+                                         inflow_left, inflow_right))
+
+    # 2) local update, independent between the domains
+    for i in range(n):
+        lrs[i], grids[i] = local_step(
+            lrs[i], grids[i], F_bs[i], t, dt, rngs[i],
+            tol_sing_val, drop_tol, timers[i], option
+        )
 
 
 def integrate_serial(lrs: list[LR], grids: list[Grid_1x1d], rngs: list,
@@ -196,25 +247,8 @@ def integrate_serial(lrs: list[LR], grids: list[Grid_1x1d], rngs: list,
             if t + dt > t_f:
                 dt = t_f - t
 
-            # 1) Boundary values of all domains, from the state before the step.
-            # The neighbour rows here are what MPI exchanges,
-            # None at the physical boundary gives tanh(t)
-            F_bs = []
-            for i in range(n):
-                with timers[i]("F_b"):
-                    inflow_left = (last_row(lrs[i - 1])
-                                   if use_neighbours and i > 0 else None)
-                    inflow_right = (first_row(lrs[i + 1])
-                                    if use_neighbours and i < n - 1 else None)
-                    F_bs.append(computeF_b_edges(t, lrs[i], grids[i],
-                                                 inflow_left, inflow_right))
-
-            # 2) Local update, independent between the domains
-            for i in range(n):
-                lrs[i], grids[i] = local_step(
-                    lrs[i], grids[i], F_bs[i], t, dt, rngs[i],
-                    tol_sing_val, drop_tol, timers[i], option
-                )
+            block_step(lrs, grids, rngs, timers, t, dt, tol_sing_val, drop_tol,
+                       option, use_neighbours)
 
             t += dt
             step += 1
