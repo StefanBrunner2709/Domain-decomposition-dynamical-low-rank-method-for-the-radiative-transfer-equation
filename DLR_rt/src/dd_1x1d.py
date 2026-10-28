@@ -84,6 +84,18 @@ class RunResult:
         """
         return np.concatenate([full_f(lr) for lr in self.lrs], axis=0)
 
+    def timings_per_rank(self) -> list[dict]:
+        """Timings summed over the domains of each MPI rank, plus its exchange.
+
+        Serial: one entry, the sum over all domains.
+        """
+        owner = self.owner or [0] * self.n_domains
+        per_rank = [dict(tim) for tim in self.rank_timings] or [{}]
+        for o, tim in zip(owner, self.timings):
+            for phase, seconds in tim.items():
+                per_rank[o][phase] = per_rank[o].get(phase, 0.0) + seconds
+        return per_rank
+
     def save(self, path: Path):
         """Save f, rank history and snapshots, load again with np.load."""
         np.savez(

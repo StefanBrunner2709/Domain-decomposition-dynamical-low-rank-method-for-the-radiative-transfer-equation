@@ -152,15 +152,6 @@ def gather_result(comm, local: RunResult, root: int = 0) -> RunResult | None:
     )
 
 
-def timings_per_rank(res: RunResult) -> list[dict]:
-    """Timings summed over the domains of each rank, plus its exchange."""
-    per_rank = [dict(tim) for tim in res.rank_timings]
-    for owner, tim in zip(res.owner, res.timings):
-        for phase, seconds in tim.items():
-            per_rank[owner][phase] = per_rank[owner].get(phase, 0.0) + seconds
-    return per_rank
-
-
 if __name__ == "__main__":
     # Check against integrate_serial, used by test_mpi_matches_serial.
     # Run: mpirun -n 4 python -m DLR_rt.src.dd_mpi 8   (8 domains, default: 1 per rank)
@@ -192,7 +183,7 @@ if __name__ == "__main__":
               f"{[res.owner.count(i) for i in range(size)]}, "
               f"bit-identical to serial: {identical}, "
               f"speedup {ser.runtime / res.runtime:.2f}")
-        for i, tim in enumerate(timings_per_rank(res)):
+        for i, tim in enumerate(res.timings_per_rank()):
             print(f"  rank {i}: " + ", ".join(f"{k} {v:.2f} s" for k, v in tim.items()))
 
         assert identical
