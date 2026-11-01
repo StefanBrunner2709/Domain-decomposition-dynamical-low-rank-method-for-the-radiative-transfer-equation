@@ -10,13 +10,16 @@ final_ranks --> are the numbers in the rank snapshows corresponding to the low-r
     mpirun -n 8 python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling strong
     mpirun -n 8 python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling weak
     mpirun -n 4 python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling domains
-    python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling plot strong  (only plot)
+    python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling plot strong --inflow beam  (only plot)
+    python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling plot compare  (all strong runs)
 
 strong:  fixed Nx and fixed decomposition (n_domains = max ranks), p = 1, 2, 4, ...
          Only the distribution of the domains changes, the result is identical,
          so the speedup is purely from the parallelisation.
 weak:    Nx and n_domains grow with p, the work per rank stays the same.
 domains: fixed number of ranks, more and more domains per rank.
+
+Results are saved per inflow: data/benchmarks/strong_beam.json, plots/bench_strong_beam.png
 """
 
 import os
@@ -29,6 +32,7 @@ os.environ.setdefault("MKL_NUM_THREADS", "1")
 
 import argparse
 import json
+from functools import partial
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np 
@@ -36,11 +40,19 @@ from mpi4py import MPI
 
 
 from DLR_rt.src import plotting as P
-from DLR_rt.src.dd_1x1d import RunResult, beam_inflow, setup_domains
+from DLR_rt.src.dd_1x1d import (
+    RunResult,
+    beam_inflow,
+    pulse_inflow,
+    setup_domains,
+    two_beam_inflow,
+)
 from DLR_rt.src.dd_mpi import domain_slice, gather_result, integrate_mpi
 
 DATA_DIR = Path(__file__).resolve().parents[3] / "data" / "benchmarks"
-INFLOWS = {"tanh": None, "beam": beam_inflow}
+INFLOWS = {"tanh": None, "beam": beam_inflow, "pulse": pulse_inflow,
+           "two_beam": two_beam_inflow,
+           "sharp_beam": partial(beam_inflow, mu_min=0.95, ramp=50.0)}
 world = MPI.COMM_WORLD
 
 def run(p: int , Nx: int, n_domains: int, args) -> RunResult | None:
@@ -68,6 +80,17 @@ def run(p: int , Nx: int, n_domains: int, args) -> RunResult | None:
     world.Barrier()
     return best
 
+def rank_imbalance(res: RunResult, p: int) -> np.ndarray:
+    """
+    Max / mean over the MPI ranks of the summed low-rank r, for every time step.
+
+    Only a proxy: the cost grows slower than r, so the real imbalance is smaller.
+    """
+    hist, owner = np.array(res.rank_hist), np.array(res.owner)
+    load = np.array([hist[owner == i].sum(axis=0) for i in range(p)])
+    return load.max(axis=0) / load.mean(axis=0)
+
+
 def summary(res: RunResult, p: int, Nx: int, n_domains: int) -> dict:
     """ 
     The numbers of one run that are needed for scaling plots
@@ -75,6 +98,7 @@ def summary(res: RunResult, p: int, Nx: int, n_domains: int) -> dict:
     per_rank = res.timings_per_rank()
     busy = [sum(s for k, s in tim.items() if k != "exchange") for tim in per_rank]
     steps = len(res.time) - 1
+    every = max(1, steps // 200)  # enough points for a plot over time
     return dict(
         p=p, Nx=Nx, n_domains=n_domains, steps=steps,
         runtime=res.runtime, time_per_step=res.runtime / steps,
@@ -82,6 +106,8 @@ def summary(res: RunResult, p: int, Nx: int, n_domains: int) -> dict:
         imbalance=max(busy) / np.mean(busy),  # 1 = all ranks equally busy
         final_ranks=[h[-1] for h in res.rank_hist],
         domains_per_rank=[res.owner.count(i) for i in range(p)],
+        t_hist=res.time[::every],
+        rank_imbalance=rank_imbalance(res, p)[::every].tolist(),
     )
 
 def plot_details(res: RunResult, name: str):
@@ -110,7 +136,7 @@ def strong(args) -> list[dict]:
                                     and res.rank_hist == ref.rank_hist)
             records.append(rec)
             if p == max(args.ranks):
-                plot_details(res, f"bench_strong_p{p}")
+                plot_details(res, f"bench_strong_{args.inflow}_p{p}")
     return records
 
 def weak(args) -> list[dict]:
@@ -121,7 +147,7 @@ def weak(args) -> list[dict]:
         if res is not None:
             records.append(summary(res, p, Nx, n_domains))
             if p == max(args.ranks):
-                plot_details(res, f"bench_weak_p{p}")
+                plot_details(res, f"bench_weak_{args.inflow}_p{p}")
     return records
 
 def domains(args) -> list[dict]:
@@ -131,10 +157,10 @@ def domains(args) -> list[dict]:
         res = run(p, args.Nx, n_domains, args)
         if res is not None:
             records.append(summary(res, p, args.Nx, n_domains))
-            plot_details(res, f"bench_domains_{n_domains}")
+            plot_details(res, f"bench_domains_{args.inflow}_{n_domains}")
     return records
 
-def plot_summary(experiment: str, records: list[dict]):
+def plot_summary(experiment: str, records: list[dict], inflow: str):
     p = np.array([rec["p"] for rec in records])
     t = np.array([rec["time_per_step"] for rec in records]) * 1e3
     imbalance = [rec["imbalance"] for rec in records]
@@ -174,7 +200,27 @@ def plot_summary(experiment: str, records: list[dict]):
     for ax in axes:
         if ax.get_legend_handles_labels()[0]:
             ax.legend(fontsize=8)
-    print(f"Saved {P.save_fig(fig, f'bench_{experiment}')}")
+    print(f"Saved {P.save_fig(fig, f'bench_{experiment}_{inflow}')}")
+
+
+def plot_compare():
+    """Imbalance over time of the largest p of all strong_<inflow>.json."""
+    print(f"\n{'inflow':>12} {'p':>3} {'busy imbalance':>15} {'speedup':>8}  final ranks")
+    fig, ax = plt.subplots(figsize=(9, 5))
+    for inflow in INFLOWS:
+        path = DATA_DIR / f"strong_{inflow}.json"
+        if path.exists():
+            records = json.loads(path.read_text())["records"]
+            rec = records[-1]
+            ax.plot(rec["t_hist"], rec["rank_imbalance"], lw=2, label=inflow)
+            print(f"{inflow:>12} {rec['p']:>3} {rec['imbalance']:>15.2f} "
+                  f"{records[0]['time_per_step'] / rec['time_per_step']:>8.2f}  "
+                  f"{rec['final_ranks']}")
+    ax.axhline(1.0, color="k", ls="--", lw=1)
+    ax.set(xlabel="$t$", ylabel="max / mean of the rank load", ylim=(0.95, None),
+           title="Load imbalance over time (from the low-rank r, not measured time)")
+    ax.legend(fontsize=8)
+    print(f"Saved {P.save_fig(fig, 'bench_compare_inflows')}")
 
 
 def print_table(records: list[dict]):
@@ -209,8 +255,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.experiment == "plot":
-        path = DATA_DIR / f"{args.plot_experiment}.json"
-        plot_summary(args.plot_experiment, json.loads(path.read_text())["records"])
+        if args.plot_experiment == "compare":
+            plot_compare()
+        else:
+            path = DATA_DIR / f"{args.plot_experiment}_{args.inflow}.json"
+            plot_summary(args.plot_experiment, json.loads(path.read_text())["records"],
+                         args.inflow)
     else:
         size = world.Get_size()
         args.ranks = args.ranks or [p for p in (1, 2, 4, 8, 16, 32, 64) if p <= size]
@@ -222,7 +272,7 @@ if __name__ == "__main__":
         if world.Get_rank() == 0:
             print_table(records)
             DATA_DIR.mkdir(parents=True, exist_ok=True)
-            path = DATA_DIR / f"{args.experiment}.json"
+            path = DATA_DIR / f"{args.experiment}_{args.inflow}.json"
             path.write_text(json.dumps(dict(args=vars(args), records=records), indent=1))
             print(f"Saved {path}")
-            plot_summary(args.experiment, records)
+            plot_summary(args.experiment, records, args.inflow)

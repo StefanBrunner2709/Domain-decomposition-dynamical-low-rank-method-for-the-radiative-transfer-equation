@@ -177,6 +177,48 @@ def beam_inflow(t: float, mu: np.ndarray, mu_min: float = 0.8, ramp: float = 20.
     left = np.where(mu > mu_min, np.tanh(ramp * t), 0.0)
     return left, np.zeros_like(left)
 
+def pulse_inflow(t: float, mu: np.ndarray, mu_min: float = 0.8, ramp: float = 20.0,
+                t_off: float = 0.2):
+    """ 
+    A beam from the left that is switched off after t_off
+
+    Parameters
+    ----------
+    t: float
+        Current time.
+    mu: np.ndarray
+        Grid in mu
+    mu_min:
+        Beam enters in mu > mu_min, closer to 1 is more narrow.
+    ramp: float
+        Beam is switched on as tanh(ramp * t), larger ramp is sharper.
+    t_off: float
+        Time after which the beam is switched off, using tanh(ramp * (t_off - t)).    
+    """
+    envelope= 0.5 * (np.tanh(ramp * t) - np.tanh(ramp * (t - t_off)))
+    return np.where(mu > mu_min, envelope, 0.0), np.zeros_like(envelope)
+
+def two_beam_inflow(t: float, mu: np.ndarray, mu_min: float = 0.8, ramp: float = 20.0):
+    """ 
+    Narrow beams from both sides that meet in the middle
+
+    Parameters
+    ----------
+    t: float
+        Current time.
+    mu: np.ndarray
+        Grid in mu
+    mu_min:
+        Beam enters in mu > mu_min, closer to 1 is more narrow.
+    ramp: float
+        Beam is switched on as tanh(ramp * t), larger ramp is sharper.
+    """
+    left = np.where(mu > mu_min, np.tanh(ramp * t), 0.0)
+    right = np.where(mu < -mu_min, np.tanh(ramp * t), 0.0)
+    return left, right
+
+
+
 
 def local_step(lr: LR, grid: Grid_1x1d, F_b: np.ndarray, t: float, dt: float,
                rng, tol_sing_val: float, drop_tol: float, timer: PhaseTimer,
