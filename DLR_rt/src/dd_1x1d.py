@@ -154,6 +154,30 @@ def setup_domains(Nx: int, Nmu: int, r: int, n_domains: int, seed: int = 0,
     return grids, lr0s, rngs
 
 
+def beam_inflow(t: float, mu: np.ndarray, mu_min: float = 0.8, ramp: float = 20.0):
+    """ 
+    Sharp one-sided inflow: narrow beam from left to right
+
+    Parameters
+    ----------
+    t: float
+        Current time.
+    mu: np.ndarray
+        Grid in mu
+    mu_min:
+        Beam enters in mu > mu_min, closer to 1 is more narrow.
+    ramp: float
+        Beam is switched on as tanh(ramp * t), larger ramp is sharper.
+
+    Returns
+    -------
+    left, right
+       Inflow values on the physical boundaries, each of shape (Nmu,)
+    """
+    left = np.where(mu > mu_min, np.tanh(ramp * t), 0.0)
+    return left, np.zeros_like(left)
+
+
 def local_step(lr: LR, grid: Grid_1x1d, F_b: np.ndarray, t: float, dt: float,
                rng, tol_sing_val: float, drop_tol: float, timer: PhaseTimer,
                option: str = "lie"):
@@ -183,7 +207,8 @@ def block_step(lrs: list[LR], grids: list[Grid_1x1d], rngs: list,
                tol_sing_val: float, drop_tol: float, option: str = "lie",
                use_neighbours: bool = True,
                outer_left: np.ndarray | None = None,
-               outer_right: np.ndarray | None = None):
+               outer_right: np.ndarray | None = None,
+               inflow = None):
     """
     One time step on a block of neighbouring subdomains, ordered left to right.
 
@@ -191,6 +216,36 @@ def block_step(lrs: list[LR], grids: list[Grid_1x1d], rngs: list,
     MPI: the block is the part of one rank, outer_left/outer_right are the rows
     received from the neighbouring ranks (None at the physical boundary).
     lrs and grids are updated in place.
+
+    Parameters
+    ----------
+    lrs : list[LR]
+        Low-rank objects of the subdomains in this block.
+    grids : list[Grid_1x1d]
+        Grids of the subdomains in this block.
+    rngs : list
+        Random generators of the subdomains in this block.
+    timers : list[PhaseTimer]
+        Timers of the subdomains in this block.
+    t : float
+        Current time.
+    dt : float
+        Time step size.
+    tol_sing_val : float
+        Tolerance for adding basis functions.
+    drop_tol : float
+        Tolerance for dropping basis functions.
+    option : str
+        "lie" or "strang" for the time integrator.
+    use_neighbours : bool
+        If True, the subdomains get the inflow from their neighbours' edge rows.
+        If False (negative control), every subdomain uses tanh(t) on both sides.
+    outer_left : np.ndarray or None
+        Left inflow row from the left neighbour, or None at the physical boundary.
+    outer_right : np.ndarray or None
+        Right inflow row from the right neighbour, or None at the physical boundary.
+    inflow : callable or None
+        inflow(t, mu) -> (left, right) at the physical boundary, None is tanh(t).
     """
     n = len(lrs)
 
@@ -202,6 +257,10 @@ def block_step(lrs: list[LR], grids: list[Grid_1x1d], rngs: list,
             if use_neighbours:
                 inflow_left = last_row(lrs[i - 1]) if i > 0 else outer_left
                 inflow_right = first_row(lrs[i + 1]) if i < n - 1 else outer_right
+                if inflow is not None:
+                    bc_left, bc_right = inflow(t, grids[i].MU)
+                    inflow_left = bc_left if inflow_left is None else inflow_left
+                    inflow_right = bc_right if inflow_right is None else inflow_right
             else:
                 inflow_left = inflow_right = None
             F_bs.append(computeF_b_edges(t, lrs[i], grids[i],
@@ -219,7 +278,7 @@ def integrate_serial(lrs: list[LR], grids: list[Grid_1x1d], rngs: list,
                      t_f: float, dt: float, tol_sing_val: float = 1e-6,
                      drop_tol: float = 1e-6, option: str = "lie",
                      use_neighbours: bool = True, snap_every: int | None = None,
-                     progress: bool = True) -> RunResult:
+                     progress: bool = True, inflow=None) -> RunResult:
     """
     Serial domain decomposition over n subdomains, ordered from left to right.
 
@@ -233,6 +292,8 @@ def integrate_serial(lrs: list[LR], grids: list[Grid_1x1d], rngs: list,
         If False (negative control), every subdomain uses tanh(t) on both sides.
     snap_every : int or None
         If given, f on all subdomains is stored every snap_every steps and at t_f.
+    inflow : callable or None
+        inflow(t, mu) -> (left, right) at the physical boundary, None is tanh(t).
     """
     n = len(lrs)
     lrs, grids = list(lrs), list(grids)
@@ -260,7 +321,7 @@ def integrate_serial(lrs: list[LR], grids: list[Grid_1x1d], rngs: list,
                 dt = t_f - t
 
             block_step(lrs, grids, rngs, timers, t, dt, tol_sing_val, drop_tol,
-                       option, use_neighbours)
+                       option, use_neighbours, inflow=inflow)
 
             t += dt
             step += 1

@@ -3,6 +3,7 @@ Contains helper functions.
 """
 
 import tracemalloc
+from functools import lru_cache
 
 import matplotlib.colors as colors
 import matplotlib.patches as patches
@@ -14,10 +15,6 @@ from scipy import sparse
 from scipy.sparse import diags
 
 from DLR_rt.src.grid import Grid_2x1d
-
-
-# use lru_cache to cache the upwind matrices
-from functools import lru_cache
 
 
 def compute_mass(lr, grid):
@@ -44,8 +41,7 @@ def computeD_upwind_1x1d(grid, option_bc: str = "no_dd"):
     Compute upwind difference matrices for 1x1d periodic or inflow.
     Output is DX_0 (DX-),  DX_1 (DX+).
 
-    TODO: I think the performance can be increases
-    by caching the matrices inside of this function
+    The matrices are cached and shared, so do not change them in place.
 
     Parameters
     ----------
@@ -55,6 +51,7 @@ def computeD_upwind_1x1d(grid, option_bc: str = "no_dd"):
         Can be chosen either "periodic" or "inflow".
     """
     return _upwind_matrices_1x1d(grid.Nx, grid.dx, option_bc)
+
 
 @lru_cache(maxsize=None)
 def _upwind_matrices_1x1d(Nx: int, dx: float, option_bc: str):
@@ -75,6 +72,35 @@ def _upwind_matrices_1x1d(Nx: int, dx: float, option_bc: str):
     DX_1 *= 1 / dx
 
     return DX_0.tocsr(), DX_1.tocsr()
+
+
+# OLD Implementation
+
+#@lru_cache(maxsize=None)
+#def _upwind_matrices_1x1d(Nx: int, dx: float, option_bc: str):
+#    ### Compute DX_0
+#    # Step 1: Set up upwind matrix
+#    DX_0 = sparse.lil_matrix((grid.Nx, grid.Nx), dtype=float)
+#    DX_0.setdiag(-1, k=-1)
+#    DX_0.setdiag(1, k=0)
+#
+#    if option_bc == "periodic":
+#        DX_0[0, grid.Nx - 1] = -1
+#
+#    ### Compute DX_1
+#    # Step 1: Set up upwind matrix
+#    DX_1 = sparse.lil_matrix((grid.Nx, grid.Nx), dtype=float)
+#    DX_1.setdiag(-1, k=0)
+#    DX_1.setdiag(1, k=1)
+#
+#    if option_bc == "periodic":
+#        DX_1[grid.Nx - 1, 0] = 1
+#
+#    ### Scale matrices (different scaling then cendiff)
+#    DX_0 *= 1 / grid.dx
+#    DX_1 *= 1 / grid.dx
+#
+#    return DX_0.tocsr(), DX_1.tocsr()
 
 
 def computeD_cendiff_2x1d(grid: Grid_2x1d, option_dd: str = "no_dd"):

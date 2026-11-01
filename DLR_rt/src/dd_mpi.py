@@ -54,7 +54,7 @@ def integrate_mpi(lrs: list[LR], grids: list[Grid_1x1d], rngs: list,
                   tol_sing_val: float = 1e-6, drop_tol: float = 1e-6,
                   option: str = "lie", use_neighbours: bool = True,
                   snap_every: int | None = None,
-                  progress: bool = True) -> RunResult:
+                  progress: bool = True, inflow=None) -> RunResult:
     """
     Integrate this rank's block of subdomains, all ranks call this together.
 
@@ -101,7 +101,8 @@ def integrate_mpi(lrs: list[LR], grids: list[Grid_1x1d], rngs: list,
             block_step(lrs, grids, rngs, timers, t, dt, tol_sing_val, drop_tol,
                        option, use_neighbours,
                        outer_left=from_left if has_left else None,
-                       outer_right=from_right if has_right else None)
+                       outer_right=from_right if has_right else None,
+                       inflow=inflow)
 
             t += dt
             step += 1

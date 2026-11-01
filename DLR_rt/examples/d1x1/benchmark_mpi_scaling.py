@@ -36,10 +36,11 @@ from mpi4py import MPI
 
 
 from DLR_rt.src import plotting as P
-from DLR_rt.src.dd_1x1d import RunResult, setup_domains
+from DLR_rt.src.dd_1x1d import RunResult, beam_inflow, setup_domains
 from DLR_rt.src.dd_mpi import domain_slice, gather_result, integrate_mpi
 
 DATA_DIR = Path(__file__).resolve().parents[3] / "data" / "benchmarks"
+INFLOWS = {"tanh": None, "beam": beam_inflow}
 world = MPI.COMM_WORLD
 
 def run(p: int , Nx: int, n_domains: int, args) -> RunResult | None:
@@ -58,7 +59,8 @@ def run(p: int , Nx: int, n_domains: int, args) -> RunResult | None:
             mine = domain_slice(n_domains, sub)
             sub.Barrier()
             local = integrate_mpi(lr0s[mine], grids[mine], rngs[mine], args.t_f, dt,
-                                  sub, args.tol, args.tol, progress=False)
+                                  sub, args.tol, args.tol, progress=False,
+                                  inflow=INFLOWS[args.inflow])
             res = gather_result(sub, local)
             if res is not None and (best is None or res.runtime < best.runtime):
                 best = res
@@ -198,6 +200,7 @@ if __name__ == "__main__":
     parser.add_argument("--cfl", type=float, default=0.25)
     parser.add_argument("--tol", type=float, default=1e-5)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--inflow", choices=list(INFLOWS), default="tanh")
     parser.add_argument("--repeat", type=int, default=1, help="take the fastest run")
     parser.add_argument("--ranks", type=int, nargs="+", help="default 1, 2, 4, ... <= size")
     parser.add_argument("--n_domains", type=int,
