@@ -196,7 +196,8 @@ def pulse_inflow(t: float, mu: np.ndarray, mu_min: float = 0.8, ramp: float = 20
         Time after which the beam is switched off, using tanh(ramp * (t_off - t)).    
     """
     envelope= 0.5 * (np.tanh(ramp * t) - np.tanh(ramp * (t - t_off)))
-    return np.where(mu > mu_min, envelope, 0.0), np.zeros_like(envelope)
+    left = np.where(mu > mu_min, envelope, 0.0)
+    return left, np.zeros_like(left)
 
 def two_beam_inflow(t: float, mu: np.ndarray, mu_min: float = 0.8, ramp: float = 20.0):
     """ 

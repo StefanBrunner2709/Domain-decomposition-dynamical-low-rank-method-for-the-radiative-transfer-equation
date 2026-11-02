@@ -11,7 +11,8 @@ final_ranks --> are the numbers in the rank snapshows corresponding to the low-r
     mpirun -n 8 python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling weak
     mpirun -n 4 python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling domains
     python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling plot strong --inflow beam  (only plot)
-    python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling plot compare  (all strong runs)
+    python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling plot compare  (all strong runs,
+                                                         imbalance and balance E(t))
 
 strong:  fixed Nx and fixed decomposition (n_domains = max ranks), p = 1, 2, 4, ...
          Only the distribution of the domains changes, the result is identical,
@@ -80,15 +81,29 @@ def run(p: int , Nx: int, n_domains: int, args) -> RunResult | None:
     world.Barrier()
     return best
 
-def rank_imbalance(res: RunResult, p: int) -> np.ndarray:
-    """
-    Max / mean over the MPI ranks of the summed low-rank r, for every time step.
-
-    Only a proxy: the cost grows slower than r, so the real imbalance is smaller.
+def rank_load(res: RunResult, p: int) -> np.ndarray:
+    """ 
+    Summed low-rank r of each MPI rank, shape [rank][time step]
     """
     hist, owner = np.array(res.rank_hist), np.array(res.owner)
-    load = np.array([hist[owner == i].sum(axis=0) for i in range(p)])
+    return np.array([hist[owner == i].sum(axis=0) for i in range(p)])
+
+def rank_imbalance(res: RunResult, p: int) -> np.ndarray:
+    """  
+    Max / Mean over the MPI ranks of the summed low-rank r, for every time step
+    
+    As the cost grows slower than r, the real imbalance is smaller
+    """
+    load = rank_load(res, p)
     return load.max(axis=0) / load.mean(axis=0)
+
+def rank_balance(res: RunResult, p: int) -> np.ndarray:
+    """ 
+    Min / Max over the MPI ranks of the summed low-rank r, 1 = perfectly balanced
+    """
+    load = rank_load(res, p)
+    return load.min(axis=0) / load.max(axis=0)
+
 
 
 def summary(res: RunResult, p: int, Nx: int, n_domains: int) -> dict:
@@ -99,15 +114,18 @@ def summary(res: RunResult, p: int, Nx: int, n_domains: int) -> dict:
     busy = [sum(s for k, s in tim.items() if k != "exchange") for tim in per_rank]
     steps = len(res.time) - 1
     every = max(1, steps // 200)  # enough points for a plot over time
+    imbalance = max(busy) / np.mean(busy)  # 1 = all ranks equally busy
+    balance = min(busy) / max(busy)  # E from the paper, 1 = perfectly balanced
     return dict(
         p=p, Nx=Nx, n_domains=n_domains, steps=steps,
         runtime=res.runtime, time_per_step=res.runtime / steps,
         busy=busy, exchange=[tim.get("exchange", 0.0) for tim in per_rank],
-        imbalance=max(busy) / np.mean(busy),  # 1 = all ranks equally busy
+        imbalance=imbalance, balance=balance,
         final_ranks=[h[-1] for h in res.rank_hist],
         domains_per_rank=[res.owner.count(i) for i in range(p)],
         t_hist=res.time[::every],
         rank_imbalance=rank_imbalance(res, p)[::every].tolist(),
+        rank_balance=rank_balance(res, p)[::every].tolist(),
     )
 
 def plot_details(res: RunResult, name: str):
@@ -204,16 +222,21 @@ def plot_summary(experiment: str, records: list[dict], inflow: str):
 
 
 def plot_compare():
-    """Imbalance over time of the largest p of all strong_<inflow>.json."""
-    print(f"\n{'inflow':>12} {'p':>3} {'busy imbalance':>15} {'speedup':>8}  final ranks")
+    """Imbalance and balance E(t) over time of the largest p of all strong_<inflow>.json."""
+    print(f"\n{'inflow':>12} {'p':>3} {'busy imbalance':>15} {'busy E':>7} {'speedup':>8}"
+          f"  final ranks")
     fig, ax = plt.subplots(figsize=(9, 5))
-    for inflow in INFLOWS:
+    fig_E, ax_E = plt.subplots(figsize=(9, 5))
+    for i, inflow in enumerate(INFLOWS):
         path = DATA_DIR / f"strong_{inflow}.json"
         if path.exists():
             records = json.loads(path.read_text())["records"]
             rec = records[-1]
-            ax.plot(rec["t_hist"], rec["rank_imbalance"], lw=2, label=inflow)
+            ax.plot(rec["t_hist"], rec["rank_imbalance"], f"C{i}", lw=2, label=inflow)
+            ax_E.plot(rec["t_hist"], rec["rank_balance"], f"C{i}", lw=2,
+                      label=rf"{inflow} (busy $\mathcal{{E}}$ = {rec['balance']:.2f})")
             print(f"{inflow:>12} {rec['p']:>3} {rec['imbalance']:>15.2f} "
+                  f"{rec['balance']:>7.2f} "
                   f"{records[0]['time_per_step'] / rec['time_per_step']:>8.2f}  "
                   f"{rec['final_ranks']}")
     ax.axhline(1.0, color="k", ls="--", lw=1)
@@ -222,15 +245,23 @@ def plot_compare():
     ax.legend(fontsize=8)
     print(f"Saved {P.save_fig(fig, 'bench_compare_inflows')}")
 
+    ax_E.axhline(1.0, color="k", ls="--", lw=1)
+    ax_E.set(xlabel="$t$", ylabel=r"$\mathcal{E}(t)$ = min / max of the rank load",
+             ylim=(0, 1.05),
+             title="Load balance over time (from the low-rank r, not measured time)")
+    ax_E.legend(fontsize=8, loc="lower right")
+    print(f"Saved {P.save_fig(fig_E, 'bench_compare_balance')}")
+
 
 def print_table(records: list[dict]):
     print(f"\n{'p':>3} {'Nx':>6} {'domains':>8} {'ms/step':>9} {'speedup':>8} "
-          f"{'imbalance':>10} {'identical':>10}  domains per rank, final ranks")
+          f"{'imbalance':>10} {'E':>6} {'identical':>10}  domains per rank, final ranks")
     t1 = records[0]["time_per_step"]
     for rec in records:
         print(f"{rec['p']:>3} {rec['Nx']:>6} {rec['n_domains']:>8} "
               f"{rec['time_per_step'] * 1e3:>9.2f} {t1 / rec['time_per_step']:>8.2f} "
-              f"{rec['imbalance']:>10.2f} {str(rec.get('identical', '-')):>10}  "
+              f"{rec['imbalance']:>10.2f} {rec['balance']:>6.2f} "
+              f"{str(rec.get('identical', '-')):>10}  "
               f"{rec['domains_per_rank']}, {rec['final_ranks']}")
 
 
