@@ -98,12 +98,15 @@ class Grid_1x1d:
 
         return left_grid, right_grid
 
-    def split_n(self, n_split: int, _coeffs=None):
+    def split_n(self, n_split: int, _coeffs=None, _sizes=None):
         """
         Split domain into n_split subdomains.
 
         Split the domain into n_split subdomains along the X grid.
         If Nx is not divisible by n_split, the first subdomains get one grid point more
+        
+        Subdomains can also be specified with _sizes
+        
 
         Parameters
         ----------
@@ -112,16 +115,29 @@ class Grid_1x1d:
         _coeffs:
             List of 1/epsilon for radiative transfer equation on each subdomain. 
             If None, value from whole domain is taken.
+        _sizes:
+            List of sizes for each subdomain. ordered left to right
+            Has to sum to Nx, If None, the grid is split evenly
         """
         if _coeffs is None:
             _coeffs = [self.coeff] * n_split
 
-        assert len(_coeffs) == n_split, "Length of _coeffs must match n_split"
-        # dx is computed as X[1] - X[0] so every subdomain needs at least 2 grid points
-        assert self.Nx >= 2 * n_split, "Nx must be at least 2 * n_split"
 
-        # array_split givers the first Nx % n_split parts
-        X_parts = np.array_split(self.X, n_split)
+        assert len(_coeffs) == n_split, "Length of _coeffs must match n_split"
+        
+        # dx is computed as X[1] - X[0] so every subdomain needs at least 2 grid points
+        if _sizes is None:
+            assert self.Nx >= 2 * n_split, "Nx must be at least 2 * n_split"
+
+            # array_split gives the first Nx % n_split parts one grid point more
+            X_parts = np.array_split(self.X, n_split)
+
+        else:
+            assert len(_sizes) == n_split, "Length of _sizes must match n_split"
+            assert sum(_sizes) == self.Nx, "Sum of _sizes must equal Nx"
+            assert min(_sizes) >= 2, "Each subdomain must have at least 2 grid points"
+
+            X_parts = np.split(self.X, np.cumsum(_sizes)[:-1])
 
 
         return [

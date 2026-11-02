@@ -50,6 +50,25 @@ def test_split_n_too_many_domains():
         Grid_1x1d(6, 16, 5).split_n(4)
 
 
+def test_split_n_sizes():
+    """_sizes gives asymmetric subdomains that still cover the whole grid."""
+    grid = Grid_1x1d(64, 16, 5)
+    grids = grid.split_n(3, _sizes=[40, 4, 20])
+    assert [g.Nx for g in grids] == [40, 4, 20]
+    assert [len(g.X) for g in grids] == [40, 4, 20]
+    assert np.array_equal(np.concatenate([g.X for g in grids]), grid.X)
+    for g in grids:
+        assert np.isclose(g.dx, grid.dx)
+
+
+@pytest.mark.parametrize("sizes", [[32, 32], [30, 30, 3], [62, 1, 1], [64, 0, 0]])
+def test_split_n_invalid_sizes(sizes):
+    """Wrong length, wrong sum or a subdomain with fewer than 2 grid points."""
+    with pytest.raises(AssertionError):
+        Grid_1x1d(64, 16, 5).split_n(3, _sizes=sizes)
+
+
+
 ### dd_1x1d: serial domain decomposition
 
 def run_serial(n_domains, **kwargs):

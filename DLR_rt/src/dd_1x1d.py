@@ -119,7 +119,7 @@ def full_f(lr: LR) -> np.ndarray:
 
 
 def setup_domains(Nx: int, Nmu: int, r: int, n_domains: int, seed: int = 0,
-                  coeffs=None):
+                  coeffs=None, sizes=None):
     """
     Split grid, initial conditions and one random generator per subdomain.
 
@@ -138,6 +138,12 @@ def setup_domains(Nx: int, Nmu: int, r: int, n_domains: int, seed: int = 0,
         Number of subdomains to split the full domain into.
     seed : int
         Seed for the global random generator, used for the initial condition.
+    coeffs : list[float] or None
+        List of 1/epsilon for radiative transfer equation on each subdomain.
+        If None, value from whole domain is taken.
+    sizes : list[int] or None
+        List of sizes for each subdomain. ordered left to right
+        Has to sum to Nx, If None, the grid is split evenly
     
     Returns
     -------
@@ -146,7 +152,7 @@ def setup_domains(Nx: int, Nmu: int, r: int, n_domains: int, seed: int = 0,
     """
     # Initial condition uses global np.random
     np.random.seed(seed)
-    grids = Grid_1x1d(Nx, Nmu, r).split_n(n_domains, _coeffs=coeffs)
+    grids = Grid_1x1d(Nx, Nmu, r).split_n(n_domains, _coeffs=coeffs, _sizes=sizes)
     lr0s = [setInitialCondition_1x1d_lr(g) for g in grids]
     # Own generator per subdomain for add_basis_functions, independent of
     # the order in which the domains are updated (serial vs MPI)

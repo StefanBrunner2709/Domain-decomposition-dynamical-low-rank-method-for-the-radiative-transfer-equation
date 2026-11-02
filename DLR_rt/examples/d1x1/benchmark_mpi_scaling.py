@@ -10,6 +10,7 @@ final_ranks --> are the numbers in the rank snapshows corresponding to the low-r
     mpirun -n 8 python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling strong
     mpirun -n 8 python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling weak
     mpirun -n 4 python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling domains
+    mpirun -n 8 python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling asymmetric
     python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling plot strong --inflow beam  (only plot)
     python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling plot compare  (all strong runs,
                                                          imbalance and balance E(t))
@@ -19,6 +20,8 @@ strong:  fixed Nx and fixed decomposition (n_domains = max ranks), p = 1, 2, 4, 
          so the speedup is purely from the parallelisation.
 weak:    Nx and n_domains grow with p, the work per rank stays the same.
 domains: fixed number of ranks, more and more domains per rank.
+asymmetric: fixed Nx and ranks, one domain per rank. Even split vs. more ranks at the
+         physical boundaries vs. more ranks in the middle (smaller domains there).
 
 Results are saved per inflow: data/benchmarks/strong_beam.json, plots/bench_strong_beam.png
 """
@@ -56,7 +59,7 @@ INFLOWS = {"tanh": None, "beam": beam_inflow, "pulse": pulse_inflow,
            "sharp_beam": partial(beam_inflow, mu_min=0.95, ramp=50.0)}
 world = MPI.COMM_WORLD
 
-def run(p: int , Nx: int, n_domains: int, args) -> RunResult | None:
+def run(p: int , Nx: int, n_domains: int, args, sizes=None) -> RunResult | None:
     """ 
     Run on the first p ranks, take best of args.repeat runs
 
@@ -68,7 +71,8 @@ def run(p: int , Nx: int, n_domains: int, args) -> RunResult | None:
     if sub != MPI.COMM_NULL:
         dt = args.cfl / Nx  # dx = 1 / (Nx + 1), so dt <= cfl * dx
         for _ in range(args.repeat):
-            grids, lr0s, rngs = setup_domains(Nx, args.Nmu, args.r, n_domains, args.seed)
+            grids, lr0s, rngs = setup_domains(Nx, args.Nmu, args.r, n_domains, args.seed,
+                                              sizes=sizes)
             mine = domain_slice(n_domains, sub)
             sub.Barrier()
             local = integrate_mpi(lr0s[mine], grids[mine], rngs[mine], args.t_f, dt,
@@ -178,7 +182,80 @@ def domains(args) -> list[dict]:
             plot_details(res, f"bench_domains_{args.inflow}_{n_domains}")
     return records
 
+def layout_sizes(Nx: int, n_domains: int, refine: str) -> list[int]:
+    """
+    Mirror-symmetric subdomain sizes, with one domain per rank small domains = more ranks.
+
+    refine = "boundary": small at both physical boundaries, e.g. 1 : 2 : 3 : 4 : 4 : ... : 1
+    refine = "middle": exactly the other way around, e.g. 4 : 3 : 2 : 1 : 1 : ... : 4
+    """
+    weights = np.minimum(np.arange(1, n_domains + 1), np.arange(n_domains, 0, -1))
+    if refine == "middle":
+        weights = weights.max() + 1 - weights
+    sizes = Nx * weights // weights.sum()
+    # Remainder goes to the largest domains
+    sizes[np.argsort(-weights, kind="stable")[:Nx - sizes.sum()]] += 1
+    return sizes.tolist()
+
+def asymmetric(args) -> list[dict]:
+    """
+    Even split vs. more ranks at the boundaries vs. more ranks in the middle.
+
+    Every layout is also run on 1 rank, it has to be bit-identical.
+    """
+    p = max(args.ranks)
+    n_domains = args.n_domains or p
+    layouts = {"even": None,
+               "boundary": layout_sizes(args.Nx, n_domains, "boundary"),
+               "middle": layout_sizes(args.Nx, n_domains, "middle")}
+    # Fewer grid points than r crashes in add_basis_functions, other ranks would hang
+    assert min(layouts["boundary"]) >= args.r, "Every subdomain needs at least r grid points"
+
+    records, f_even = [], None
+    for layout, sizes in layouts.items():
+        res = run(p, args.Nx, n_domains, args, sizes)
+        ref = run(1, args.Nx, n_domains, args, sizes)
+        if res is not None:
+            f_even = res.f() if f_even is None else f_even
+            diff = np.linalg.norm(res.f() - f_even) / np.linalg.norm(f_even)
+            rec = summary(res, p, args.Nx, n_domains)
+            rec.update(layout=layout, sizes=[g.Nx for g in res.grids],
+                       rel_diff_even=float(diff),
+                       identical=bool(np.array_equal(res.f(), ref.f())
+                                      and res.rank_hist == ref.rank_hist))
+            records.append(rec)
+            print(f"{layout:>9}: sizes = {rec['sizes']}, f vs. even: {diff:.2e}")
+            plot_details(res, f"bench_asymmetric_{layout}_{args.inflow}_p{p}")
+    return records
+
+def plot_asymmetric(records: list[dict], inflow: str):
+    """Balance E(t) and busy time per MPI rank of all layouts of 'asymmetric'."""
+    styles = ["-", "--", ":"]  # layouts stay apart without colour as well
+    markers = ["o", "s", "^"]
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
+    for i, rec in enumerate(records):
+        axes[0].plot(rec["t_hist"], rec["rank_balance"], f"C{i}", ls=styles[i], lw=2,
+                     label=rf"{rec['layout']} (busy $\mathcal{{E}}$ = {rec['balance']:.2f})")
+        axes[1].plot(range(rec["p"]), rec["busy"], f"C{i}", ls=styles[i], lw=2,
+                     marker=markers[i], ms=8,
+                     label=f"{rec['layout']} ({rec['time_per_step'] * 1e3:.2f} ms/step)")
+    ranks = range(records[0]["p"])
+    axes[0].axhline(1.0, color="k", ls="--", lw=1)
+    axes[0].set(xlabel="$t$", ylabel=r"$\mathcal{E}(t)$ = min / max of the rank load",
+                ylim=(0, 1.05), title="Load balance over time (from the low-rank r)")
+    axes[1].set(xlabel="MPI rank", ylabel="busy time [s]", ylim=(0, None), xticks=ranks,
+                xticklabels=[f"P{i}" for i in ranks], title="Busy time per rank")
+    for ax in axes:
+        ax.legend(fontsize=8, loc="lower right")
+    fig.suptitle(f"{records[0]['n_domains']} domains on {records[0]['p']} ranks, "
+                 f"Nx = {records[0]['Nx']}, inflow {inflow}")
+    print(f"Saved {P.save_fig(fig, f'bench_asymmetric_{inflow}')}")
+
 def plot_summary(experiment: str, records: list[dict], inflow: str):
+    if experiment == "asymmetric":
+        plot_asymmetric(records, inflow)
+        return
+
     p = np.array([rec["p"] for rec in records])
     t = np.array([rec["time_per_step"] for rec in records]) * 1e3
     imbalance = [rec["imbalance"] for rec in records]
@@ -262,20 +339,21 @@ def print_table(records: list[dict]):
               f"{rec['time_per_step'] * 1e3:>9.2f} {t1 / rec['time_per_step']:>8.2f} "
               f"{rec['imbalance']:>10.2f} {rec['balance']:>6.2f} "
               f"{str(rec.get('identical', '-')):>10}  "
-              f"{rec['domains_per_rank']}, {rec['final_ranks']}")
+              f"{rec['domains_per_rank']}, {rec['final_ranks']}  {rec.get('layout', '')}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("experiment", choices=["strong", "weak", "domains", "plot"])
+    parser.add_argument("experiment",
+                        choices=["strong", "weak", "domains", "asymmetric", "plot"])
     parser.add_argument("plot_experiment", nargs="?", help="for 'plot': which one")
     parser.add_argument("--Nx", type=int, default=512, help="(per rank for weak)")
     parser.add_argument("--Nmu", type=int, default=64)
     parser.add_argument("--r", type=int, default=5, help="initial rank")
     parser.add_argument("--t_f", type=float, default=1.0)
     parser.add_argument("--cfl", type=float, default=0.25)
-    parser.add_argument("--tol", type=float, default=1e-5)
+    parser.add_argument("--tol", type=float, default=1e-7)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--inflow", choices=list(INFLOWS), default="tanh")
     parser.add_argument("--repeat", type=int, default=1, help="take the fastest run")
@@ -297,7 +375,8 @@ if __name__ == "__main__":
         args.ranks = args.ranks or [p for p in (1, 2, 4, 8, 16, 32, 64) if p <= size]
         assert max(args.ranks) <= size, "Start mpirun with at least max(--ranks) ranks"
 
-        experiment = {"strong": strong, "weak": weak, "domains": domains}[args.experiment]
+        experiment = {"strong": strong, "weak": weak, "domains": domains,
+                      "asymmetric": asymmetric}[args.experiment]
         records = experiment(args)
 
         if world.Get_rank() == 0:
