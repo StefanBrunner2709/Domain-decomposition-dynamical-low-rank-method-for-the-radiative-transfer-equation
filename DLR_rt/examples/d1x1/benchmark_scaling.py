@@ -12,12 +12,14 @@ os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 
+import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 from DLR_rt.src.dd_1x1d import integrate_serial, setup_domains
+from DLR_rt.src.sysinfo import print_system_info, system_info
 
 T_F = 0.05  # short runs, we only compare
 CFL = 0.25  # dt = CFL * dx
@@ -39,6 +41,9 @@ def time_per_step(Nx, Nmu=128, tol=1e-5, n_domains=1):
 
 
 if __name__ == "__main__":
+    info = system_info()
+    print_system_info(info)
+
     Nxs = np.array([128, 256, 512, 1024, 2048])
     Nmus = np.array([64, 128, 256, 512])
 
@@ -65,4 +70,5 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.savefig(savepath / "scaling.png", dpi=200)
     np.savez(savepath / "scaling.npz", Nxs=Nxs, Nmus=Nmus,
-             t_Nx_1=t_Nx_1, t_Nx_2=t_Nx_2, t_Nmu=t_Nmu)
+             t_Nx_1=t_Nx_1, t_Nx_2=t_Nx_2, t_Nmu=t_Nmu,
+             system=json.dumps(info))  # read: json.loads(str(data["system"]))

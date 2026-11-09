@@ -29,9 +29,10 @@ Results are saved per inflow: data/benchmarks/strong_beam.json, plots/bench_stro
 import os
 
 # BLAS and LAPACK to 1 thread per MPI rank, has to be set before numpy is imported
-os.environ.setdefault("OMP_NUM_THREADS", "1")
-os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
-os.environ.setdefault("MKL_NUM_THREADS", "1")
+# Always overwrite, the shell may set e.g. OMP_NUM_THREADS=22 globally
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
 
 
 import argparse
@@ -52,6 +53,7 @@ from DLR_rt.src.dd_1x1d import (
     two_beam_inflow,
 )
 from DLR_rt.src.dd_mpi import domain_slice, gather_result, integrate_mpi
+from DLR_rt.src.sysinfo import print_system_info, system_info
 
 DATA_DIR = Path(__file__).resolve().parents[3] / "data" / "benchmarks"
 INFLOWS = {"tanh": None, "beam": beam_inflow, "pulse": pulse_inflow,
@@ -375,6 +377,14 @@ if __name__ == "__main__":
         args.ranks = args.ranks or [p for p in (1, 2, 4, 8, 16, 32, 64) if p <= size]
         assert max(args.ranks) <= size, "Start mpirun with at least max(--ranks) ranks"
 
+        # System info at the start (date, load), plus the CPUs each rank may run on,
+        # this shows if the ranks were bound to cores (mpirun --bind-to core)
+        rank_cpus = world.gather(sorted(os.sched_getaffinity(0)), root=0)
+        if world.Get_rank() == 0:
+            info = system_info()
+            info["rank_cpus"] = rank_cpus
+            print_system_info(info)
+
         experiment = {"strong": strong, "weak": weak, "domains": domains,
                       "asymmetric": asymmetric}[args.experiment]
         records = experiment(args)
@@ -383,6 +393,7 @@ if __name__ == "__main__":
             print_table(records)
             DATA_DIR.mkdir(parents=True, exist_ok=True)
             path = DATA_DIR / f"{args.experiment}_{args.inflow}.json"
-            path.write_text(json.dumps(dict(args=vars(args), records=records), indent=1))
+            path.write_text(json.dumps(dict(system=info, args=vars(args), records=records),
+                                       indent=1))
             print(f"Saved {path}")
             plot_summary(args.experiment, records, args.inflow)
