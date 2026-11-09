@@ -5,3 +5,4 @@ dlr-rt
 data/*
 !data/.gitkeep
 .vscode
+*.pyc

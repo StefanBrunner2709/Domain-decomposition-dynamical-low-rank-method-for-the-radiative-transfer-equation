@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from DLR_rt.src.dd_1x1d import full_f, integrate_serial, setup_domains
+from DLR_rt.src.dd_1x1d import full_f, integrate_serial, setup_domains, beam_inflow, pulse_inflow, two_beam_inflow, RunResult
 from DLR_rt.src.grid import Grid_1x1d
 from DLR_rt.src.lr import computeF_b, computeF_b_edges, first_row, last_row
 from DLR_rt.tests.make_reference import DT, NMU, NX, R, SEED, T_F, TOL
@@ -173,3 +173,56 @@ def test_mpi_matches_serial(n_ranks, n_domains):
     )
     assert out.returncode == 0, out.stdout + out.stderr
     assert "All checks passed" in out.stdout
+
+
+# Inflow functions
+MU = np.linspace(-1, 1, 33)
+
+@pytest.mark.parametrize("inflow", [beam_inflow, pulse_inflow, two_beam_inflow])
+def test_inflow_shapes(inflow):
+    """ 
+    Test if all inflow functions return the right shapes
+    """
+    left, right = inflow(0.5, MU)
+    assert left.shape == right.shape == MU.shape
+
+@pytest.mark.parametrize("inflow", [beam_inflow, pulse_inflow, two_beam_inflow])
+def test_inflow_zero_at_t0(inflow):
+    """ 
+    Test if inflow is consistent with the initial condition f = 0
+    """
+    left, right = inflow(0.0, MU)
+    np.testing.assert_allclose(left, 0.0, atol=1e-3)
+    np.testing.assert_allclose(right, 0.0, atol=1e-3)
+
+def test_beam_only_cone():
+    """ 
+    Nonzero only for mu > mu_min, right boundary is dark
+    """
+    left, right = beam_inflow(1.0, MU, mu_min=0.8)
+    assert np.all(left[MU <= 0.8] == 0.0)
+    assert np.all(left[MU > 0.8] > 0.99) # tan(20)=1
+    assert np.all(right == 0.0)
+
+def test_two_beam_symmetric():
+    """ 
+    Test if the right beam is the mirror image of the left beam
+    """
+    left, right = two_beam_inflow(1.0, MU)
+    np.testing.assert_array_equal(left, right[::-1])
+
+def test_pulse_switches_off():
+    left_on, _ = pulse_inflow(0.1, MU, t_off=0.2)
+    left_off, _ = pulse_inflow(1.0, MU, t_off=0.2)
+    assert left_on.max() > 0.9
+    assert left_off.max() < 1e-6
+
+def test_timings_per_rank_sums_domains():
+    """3 domains, the first two on rank 0: their phases add up, exchange added."""
+    res = RunResult(lrs=[], grids=[None] * 3, time=[0.0], rank_hist=[],
+                    timings=[{"PSI": 1.0}, {"PSI": 2.0}, {"PSI": 4.0}],
+                    mem_peak=[], owner=[0, 0, 1],
+                    rank_timings=[{"exchange": 0.5}, {"exchange": 0.1}])
+    per_rank = res.timings_per_rank()
+    assert per_rank[0] == {"exchange": 0.5, "PSI": 3.0}
+    assert per_rank[1] == {"exchange": 0.1, "PSI": 4.0}
