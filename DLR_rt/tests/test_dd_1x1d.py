@@ -226,3 +226,11 @@ def test_timings_per_rank_sums_domains():
     per_rank = res.timings_per_rank()
     assert per_rank[0] == {"exchange": 0.5, "PSI": 3.0}
     assert per_rank[1] == {"exchange": 0.1, "PSI": 4.0}
+
+def test_save_roundtrip(tmp_path):
+    res = run_serial(2, snap_every=50)
+    res.save(tmp_path / "run.npz")
+    data = np.load(tmp_path / "run.npz")
+    np.testing.assert_array_equal(data["f"], res.f())
+    assert data["rank_hist"].tolist() == res.rank_hist
+    assert data["X"].shape == (NX,)
