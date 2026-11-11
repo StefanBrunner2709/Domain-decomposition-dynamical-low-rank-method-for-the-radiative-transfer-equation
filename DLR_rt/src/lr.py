@@ -628,13 +628,30 @@ def computedxK(lr, K_bdry_left, K_bdry_right, grid, option_scheme="cendiff",
     K = lr.U @ lr.S
 
     if option_scheme == "cendiff":
-        Dx = np.zeros((grid.Nx, grid.Nx), dtype=int)
-        np.fill_diagonal(Dx[1:], -1)
-        np.fill_diagonal(Dx[:, 1:], 1)
+        # Centered differences K[i+1] - K[i-1], bit-identical to the dense
+        # matrix product below, but O(Nx r) instead of an Nx x Nx matrix every step
+        dxK = np.empty_like(K)
+        dxK[1:-1] = K[2:] - K[:-2]
+        dxK[0] = K[1] # No left neighbour inside the domain
+        dxK[-1] = -K[-2] # No right neighbour inside the domain
+        dxK /= 2 * grid.dx
 
-        dxK = Dx @ K / (2 * grid.dx)
         dxK[0, :] -= K_bdry_left / (2 * grid.dx)
         dxK[-1, :] += K_bdry_right / (2 * grid.dx)
+
+
+
+#    if option_scheme == "cendiff":
+        # TODO: @ Stefan in my option this build dense matrices i think the upper implementation
+        # kind of fixed this, but i am not sure if it is correct.
+
+#        Dx = np.zeros((grid.Nx, grid.Nx), dtype=int)
+#        np.fill_diagonal(Dx[1:], -1)
+#        np.fill_diagonal(Dx[:, 1:], 1)
+#
+#        dxK = Dx @ K / (2 * grid.dx)
+#        dxK[0, :] -= K_bdry_left / (2 * grid.dx)
+#        dxK[-1, :] += K_bdry_right / (2 * grid.dx)
     
     elif option_scheme == "upwind":
         DX_0, DX_1 = computeD_upwind_1x1d(grid, option_bc="inflow")
@@ -817,7 +834,9 @@ def computeC(lr, grid, dimensions="1x1d"):
         Can be chosen "1x1d" or "2x1d".
     """
     if dimensions == "1x1d":
-        C1 = (lr.V.T @ np.diag(grid.MU) @ lr.V) * grid.dmu
+        # V^T diag(mu) V without the dense Nmu x Nmu diagonal matrix, bit-identical
+        C1 = ((lr.V.T * grid.MU) @ lr.V) * grid.dmu
+        # C1 = (lr.V.T @ np.diag(grid.MU) @ lr.V) * grid.dmu
 
         C2 = (lr.V.T @ np.ones((grid.Nmu, 1))).T * grid.dmu
 
@@ -1311,13 +1330,16 @@ def Lstep(L, D1, B1, grid, lr=None, inflow=False,
     if dimensions == "1x1d":
         if inflow:
             rhs = (
-                -(grid.coeff) * np.diag(grid.MU) @ lr.V @ D1.T
+                # diag(-coeff mu) @ V without the dense Nmu x Nmu matrix, bit-identical
+                ((-(grid.coeff) * grid.MU)[:, None] * lr.V) @ D1.T
+                # -(grid.coeff) * np.diag(grid.MU) @ lr.V @ D1.T
                 + 0.5 * (grid.coeff) ** 2 * np.ones((grid.Nmu, 1)) @ B1
                 - (grid.coeff) ** 2 * L
             )
         else:
             rhs = (
-                -(grid.coeff) * np.diag(grid.MU) @ L @ D1.T
+                ((-(grid.coeff) * grid.MU)[:, None] * L) @ D1.T
+                # -(grid.coeff) * np.diag(grid.MU) @ L @ D1.T
                 + 0.5 * (grid.coeff) ** 2 * np.ones((grid.Nmu, 1)) @ B1
                 - (grid.coeff) ** 2 * L
             )
