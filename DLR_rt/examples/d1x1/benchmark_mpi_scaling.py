@@ -449,7 +449,8 @@ def dynamic(args) -> list[dict]:
 
     for p in [p for p in args.ranks if p > 1]:
         variants = {"even": None}
-        variants.update({f"dynamic {e}": dict(every=e, weights=args.weights)
+        variants.update({f"dynamic {e}": dict(every=e, weights=args.weights,
+                                              min_gain=args.min_gain)
                          for e in args.every})
         for split, balance in variants.items():
             res = run(p, args.Nx, n_domains, args, balance=balance)
@@ -460,10 +461,13 @@ def dynamic(args) -> list[dict]:
                        identical=bool(np.array_equal(res.f(), ref.f())
                                       and res.rank_hist == ref.rank_hist))
             records.append(rec)
+            if balance and p == max(args.ranks):
+                name = f"bench_dynamic_reassign_{tag(args)}_p{p}_every{balance['every']}"
+                print(f"Saved {P.save_fig(P.plot_reassignment(res), name)}")
 
     if world.Get_rank() == 0:
         print(f"\n{'p':>3} {'variant':>12} {'ms/step':>8} {'gain':>6} {'imbalance':>10} "
-              f"{'changes':>8} {'moved':>6} {'rebalance':>10}  final bounds")
+              f"{'changes':>8} {'moved':>6} {'rebal.+wait':>11}  final bounds")
         even = {}
         for rec in records[1:]:
             even.setdefault(rec["p"], rec["time_per_step"])
@@ -473,7 +477,7 @@ def dynamic(args) -> list[dict]:
             print(f"{rec['p']:>3} {rec['split']:>12} {rec['time_per_step'] * 1e3:>8.2f} "
                   f"{even[rec['p']] / rec['time_per_step']:>5.2f}x "
                   f"{rec['imbalance']:>10.2f} {bal.get('n_changes', '-'):>8} "
-                  f"{bal.get('n_moved', '-'):>6} {share:>9.1f}%  {final}")
+                  f"{bal.get('n_moved', '-'):>6} {share:>10.1f}%  {final}")
     return records
 
 
@@ -673,6 +677,9 @@ if __name__ == "__main__":
                         help="balanced: busy time per subdomain of the 1-rank run, "
                              "dynamic: since the last rebalance, "
                              "or the cost model (Nx + Nmu) r^2 + r^3")
+    parser.add_argument("--min_gain", type=float, default=0.05,
+                        help="dynamic: migrate only if the slowest rank gets this "
+                             "fraction faster (hysteresis against flip-flopping)")
     parser.add_argument("--every", type=int, nargs="+", default=[50],
                         help="dynamic: rebalance every ... steps, one run per value")
     parser.add_argument("--domains", type=int, nargs="+", help="for 'domains'")

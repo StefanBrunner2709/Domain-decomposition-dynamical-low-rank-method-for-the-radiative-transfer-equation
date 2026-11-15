@@ -26,6 +26,11 @@ def owners(bounds, n: int) -> np.ndarray:
     return np.searchsorted(bounds, np.arange(n), side="right") - 1
 
 
+def max_block(weights: np.ndarray, bounds) -> float:
+    """Largest summed weight of a block, the cost of the slowest rank."""
+    return float(max(weights[a:b].sum() for a, b in zip(bounds, bounds[1:])))
+
+
 def migrate(comm, old: list[int], new: list[int], domains: dict) -> dict:
     """
     Send every local subdomain to its owner in the new split.
@@ -62,8 +67,13 @@ class Balancer:
     weights: "model" or "measured"
         "model": (Nx + Nmu) r^2 + r^3 from the current rnaks of the subdomains
         "measured": the busy stime per subdomain since the last rebalance
+    min_gain : float
+        Hysteresis: only migrate if the new split lowers the largest block cost by
+        at least this fraction (0.05 = 5 %). Without it the noise of the measured
+        weights makes the split flip back and forth between nearly equal splits.
     """
-    def __init__(self, comm, bounds, every: int = 10, weights: str = "measured"):
+    def __init__(self, comm, bounds, every: int = 10, weights: str = "measured",
+                 min_gain: float = 0.05):
         assert weights in ("model", "measured"), f"Unknown weights {weights}"
         assert len(bounds) == comm.Get_size() + 1, "bounds must be of length p+1"
         assert every >= 1, "every must be at least 1"
@@ -71,6 +81,7 @@ class Balancer:
         self.bounds = [int(b) for b in bounds]  # python ints, numpy ints are not JSON
         self.every = every
         self.weights = weights
+        self.min_gain = min_gain
         self._busy0 = None # busy time since the last rebalance
         self.history = [(0.0, list(self.bounds))] # (t, bounds) after every change
         self.events = []
@@ -89,7 +100,7 @@ class Balancer:
 
     def summary(self) -> dict:
         """Everything for the benchmark JSON (the same on every rank)."""
-        return dict(every=self.every, weights=self.weights,
+        return dict(every=self.every, weights=self.weights, min_gain=self.min_gain,
                     n_rebalances=len(self.events),
                     n_changes=len(self.history) - 1, n_moved=self.n_moved,
                     cost=float(sum(c for _, _, c in self.events)),
@@ -118,6 +129,8 @@ class Balancer:
                  else self._busy(domains["timers"]))
         w = np.concatenate(self.comm.allgather(np.asarray(local, dtype=float)))
         new = balanced_bounds(w, self.comm.Get_size())
+        if max_block(w, new) > (1.0 - self.min_gain) * max_block(w, self.bounds):
+            new = self.bounds  # gain too small for a migration (hysteresis)
 
         moved = 0
         if new != self.bounds:

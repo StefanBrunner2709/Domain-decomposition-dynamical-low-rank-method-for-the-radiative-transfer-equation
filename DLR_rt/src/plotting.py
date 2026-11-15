@@ -131,6 +131,97 @@ def plot_rank_snapshots(ax, res: RunResult, times, annotate: bool | None = None)
     cbar.set_ticks(np.arange(R.min(), R.max() + 1))
 
 
+def owner_matrix(history, t, n_domains: int) -> np.ndarray:
+    """
+    Owner rank of every subdomain at the times t, shape [time][domain].
+
+    history: Balancer.history, [(t, bounds)] after every change, starts at t = 0.
+    """
+    t_change = np.array([h[0] for h in history])
+    idx = np.searchsorted(t_change, t, side="right") - 1
+    domains = np.arange(n_domains)
+    return np.array([np.searchsorted(history[i][1], domains, side="right") - 1
+                     for i in idx])
+
+
+def bounds_steps(history, t_end: float):
+    """Times and bounds [time][rank boundary] for a step plot of the history."""
+    t = [h[0] for h in history] + [t_end]
+    bounds = np.array([h[1] for h in history] + [history[-1][1]])
+    return t, bounds
+
+
+def plot_reassignment(res: RunResult, max_points: int = 400):
+    """
+    Reassignment of the subdomains to the MPI ranks by the dynamic balancer.
+
+    (a) Owner of every subdomain over time, one colour per rank.
+    (b) Low-rank r of every subdomain over time, with the rank boundaries on top:
+        the boundaries should follow the expensive (high r) subdomains.
+    (c) Imbalance max / mean of the summed r per rank, static start split vs. the
+        dynamic split (from the ranks r, not measured time).
+    """
+    bal = res.balance
+    history = [(float(t), list(b)) for t, b in bal["history"]]
+    p, n = len(history[0][1]) - 1, res.n_domains
+    time = np.array(res.time)
+    every = max(1, len(time) // max_points)
+    t = time[::every]
+    R = np.array(res.rank_hist)[:, ::every].T  # [time][domain]
+    O = owner_matrix(history, t, n)
+    O_static = owner_matrix(history[:1], t, n)
+    t_steps, bounds = bounds_steps(history, time[-1])
+    t_change = [h[0] for h in history[1:]]
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    # Edges for pcolormesh: time between the samples, subdomains at k - 0.5
+    t_edges = np.append(t, time[-1])
+    d_edges = np.arange(n + 1) - 0.5
+
+    # (a) Owner map, qualitative colours, neighbouring ranks clearly different
+    cmap = plt.get_cmap("tab20" if p > 10 else "tab10", p)
+    im = axes[0].pcolormesh(t_edges, d_edges, O.T, cmap=cmap, shading="flat",
+                            norm=BoundaryNorm(np.arange(p + 1) - 0.5, p))
+    cbar = fig.colorbar(im, ax=axes[0], label="MPI rank")
+    cbar.set_ticks(range(p), labels=[f"P{k}" for k in range(p)])
+    for tc in t_change:  # times where the split changed
+        axes[0].axvline(tc, color="k", lw=0.6, ls=":", alpha=0.6)
+    axes[0].set(xlabel="$t$", ylabel="subdomain",
+                title=f"(a) Owner of each subdomain "
+                      f"({bal['n_changes']} changes, {bal['n_moved']} moves)")
+
+    # (b) Rank r with the rank boundaries
+    r_bounds = np.arange(R.min(), R.max() + 2) - 0.5
+    im = axes[1].pcolormesh(t_edges, d_edges, R.T, cmap="viridis", shading="flat",
+                            norm=BoundaryNorm(r_bounds, plt.cm.viridis.N))
+    fig.colorbar(im, ax=axes[1], label="rank $r$")
+    for k in range(1, p):
+        axes[1].step(t_steps, bounds[:, k] - 0.5, where="post", color="w", lw=1.5)
+    axes[1].set(xlabel="$t$", ylabel="subdomain",
+                title="(b) Low-rank $r$ and rank boundaries (white)")
+    for ax in axes[:2]:
+        ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+
+    # (c) Imbalance of the summed r per rank, static vs. dynamic
+    # Dynamic first, the static dashed line on top stays visible where they agree
+    for i, (owner, label, style) in enumerate(
+            [(O, f"dynamic, every {bal['every']} steps", "-"),
+             (O_static, "static (start split)", "--")]):
+        load = np.array([[R[k, owner[k] == q].sum() for q in range(p)]
+                         for k in range(len(t))])
+        axes[2].plot(t, load.max(axis=1) / load.mean(axis=1), f"C{1 - i}", ls=style,
+                     lw=2, label=label)
+    axes[2].axhline(1.0, color="k", ls=":", lw=1)
+    axes[2].set(xlabel="$t$", ylabel="max / mean of the summed $r$ per rank",
+                ylim=(0.95, None), title="(c) Load imbalance over time")
+    axes[2].legend(fontsize=9)
+
+    fig.suptitle(f"Dynamic load balancing: {n} subdomains on {p} ranks, "
+                 f"Nx = {sum(g.Nx for g in res.grids)}, weights {bal['weights']}")
+    fig.tight_layout()
+    return fig
+
+
 def plot_timings_per_rank(ax, res: RunResult):
     """
     Measured time per phase, stacked per MPI rank.
