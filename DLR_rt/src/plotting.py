@@ -146,7 +146,7 @@ def plot_timings_per_rank(ax, res: RunResult):
                color=f"C{PHASES.index(phase)}", edgecolor="w", linewidth=1)
         bottom += values
     ax.set_xticks(x, [f"P{p}" for p in x])
-    ax.set(xlabel="MPI rank", ylabel="time [s]", title="Measured time per rank")
+    ax.set(xlabel="MPI rank", ylabel="time (s)", title="Measured time per rank")
     ax.legend(fontsize=8)
 
 
