@@ -46,15 +46,31 @@ def domain_slice(n_domains: int, comm) -> slice:
     return slice(start, start + base + (rank < extra))
 
 
+def even_bounds(n_domains: int, p: int) -> list[int]:
+    """Bounds of domain_slice for all p ranks, rank k gets bounds[k]:bounds[k+1]."""
+    assert n_domains >= p, "Need at least one subdomain per rank"
+    base, extra = divmod(n_domains, p)
+    return [k * base + min(k, extra) for k in range(p + 1)]
+
+
 """
 Splitting method for 1D
 """
-def model_weights(grids: list[Grid_1x1d]) -> np.ndarray:
-    """ 
-    Uses a cost model for one step per subdomain
-    here i kind of adapted this from the paper (Nx + Nmu) * r² + r³ 
+def model_weights(grids: list[Grid_1x1d], rank_hist=None) -> np.ndarray:
     """
-    return np.array([(g.Nx + g.Nmu) * g.r**2 + g.r**3 for g in grids])
+    Uses a cost model for one step per subdomain
+    here i kind of adapted this from the paper (Nx + Nmu) * r² + r³
+
+    rank_hist: low-rank r over time of every subdomain (e.g. from a previous run),
+    the cost is averaged over time. Without it the current g.r is used, which right
+    after setup_domains is the initial rank r0 everywhere, so the weights would only
+    differ by Nx. The fixed cost per subdomain is not in the model (measured_weights).
+    """
+    if rank_hist is None:
+        rank_hist = [[g.r] for g in grids]
+    return np.array([np.mean((g.Nx + g.Nmu) * np.asarray(h, float)**2
+                             + np.asarray(h, float)**3)
+                     for g, h in zip(grids, rank_hist)])
 
 def prefix_sum(weights: np.ndarray) -> np.ndarray:
     """ 
@@ -149,6 +165,13 @@ def balanced_bounds(weights: np.ndarray, p: int, rtol: float = 1e-10) -> list[in
     return best
 
 
+def block_imbalance(weights, bounds: list[int]) -> float:
+    """Max / mean of the summed weights per rank for a split, 1 = perfectly balanced."""
+    prefix = prefix_sum(np.asarray(weights, dtype=float))
+    blocks = np.diff(prefix[np.asarray(bounds)])
+    return float(blocks.max() / blocks.mean())
+
+
 def _slice_of_rank(bounds: list[int], comm) -> slice:
     """Rank k gets the subdomains bounds[k]:bounds[k+1]."""
     rank = comm.Get_rank()
@@ -177,21 +200,27 @@ def exchange_edges(comm, lrs: list[LR], left_nb, right_nb,
     comm.Sendrecv(first_row(lrs[0]), dest=left_nb, recvbuf=from_right, source=right_nb)
 
 
+
+
 def integrate_mpi(lrs: list[LR], grids: list[Grid_1x1d], rngs: list,
                   t_f: float, dt: float, comm=MPI.COMM_WORLD,
                   tol_sing_val: float = 1e-6, drop_tol: float = 1e-6,
                   option: str = "lie", use_neighbours: bool = True,
                   snap_every: int | None = None,
-                  progress: bool = True, inflow=None) -> RunResult:
+                  progress: bool = True, inflow=None, balancer=None) -> RunResult:
     """
     Integrate this rank's block of subdomains, all ranks call this together.
 
     Same parameters as dd_1x1d.integrate_serial. Returns only this rank's
     subdomains, use gather_result to collect all of them on rank 0.
+
+    balancer: balancer.Balancer for dynamic load balancing. Every balancer.every
+    steps (before the exchange) the subdomains are redistributed, together with
+    their rng, timers and rank history, so the result stays bit-identical.
     """
     rank = comm.Get_rank()
+    lrs, grids, rngs = list(lrs), list(grids), list(rngs)
     n = len(lrs)
-    lrs, grids = list(lrs), list(grids)
     left_nb, right_nb = neighbours(comm)
     has_left = use_neighbours and left_nb != MPI.PROC_NULL
     has_right = use_neighbours and right_nb != MPI.PROC_NULL
@@ -200,6 +229,7 @@ def integrate_mpi(lrs: list[LR], grids: list[Grid_1x1d], rngs: list,
 
     timers = [PhaseTimer() for _ in range(n)]
     rank_timer = PhaseTimer()
+    rank_busy = 0.0  # time in block_step of this rank, whatever subdomains it has
     t = 0.0
     step = 0
     time = [t]
@@ -222,20 +252,31 @@ def integrate_mpi(lrs: list[LR], grids: list[Grid_1x1d], rngs: list,
             if t + dt > t_f:
                 dt = t_f - t
 
+            if balancer is not None:
+                # Every rank keeps a non-empty contiguous block, so the neighbour
+                # ranks and the exchange buffers (length Nmu) stay the same
+                with rank_timer("rebalance"):
+                    d = balancer.step(step, t, dict(lrs=lrs, grids=grids, rngs=rngs,
+                                                    timers=timers, rank_hist=rank_hist))
+                lrs, grids, rngs = d["lrs"], d["grids"], d["rngs"]
+                timers, rank_hist = d["timers"], d["rank_hist"]
+
             if use_neighbours:
                 with rank_timer("exchange"):
                     exchange_edges(comm, lrs, left_nb, right_nb, from_left, from_right)
 
+            t0 = perf_counter()
             block_step(lrs, grids, rngs, timers, t, dt, tol_sing_val, drop_tol,
                        option, use_neighbours,
                        outer_left=from_left if has_left else None,
                        outer_right=from_right if has_right else None,
                        inflow=inflow)
+            rank_busy += perf_counter() - t0
 
             t += dt
             step += 1
             time.append(t)
-            for i in range(n):
+            for i in range(len(lrs)):
                 rank_hist[i].append(grids[i].r)
 
             if snap_every and (step % snap_every == 0 or t >= t_f):
@@ -251,8 +292,10 @@ def integrate_mpi(lrs: list[LR], grids: list[Grid_1x1d], rngs: list,
         snap_t=snap_t,
         snap_f=snap_f,
         runtime=perf_counter() - t_start,
-        owner=[rank] * n,
+        owner=[rank] * len(lrs),
         rank_timings=[rank_timer.times],
+        rank_busy=[rank_busy],
+        balance=balancer.summary() if balancer is not None else {},
     )
 
 
@@ -278,6 +321,8 @@ def gather_result(comm, local: RunResult, root: int = 0) -> RunResult | None:
         runtime=max(p.runtime for p in parts),  # slowest rank
         owner=join("owner"),
         rank_timings=join("rank_timings"),
+        rank_busy=join("rank_busy"),
+        balance=local.balance,  # the same on every rank
     )
 
 
@@ -297,24 +342,35 @@ if __name__ == "__main__":
     rank, size = comm.Get_rank(), comm.Get_size()
     n_domains = int(sys.argv[1]) if len(sys.argv) > 1 else size
     mode = sys.argv[2] if len(sys.argv) > 2 else "even"
-    assert mode in ("even", "brute", "balanced"), f"Unknown mode {mode}"
+    #   mpirun -n 3 python -m DLR_rt.src.dd_mpi 12 dynamic  rebalance every 5 steps
+    assert mode in ("even", "brute", "balanced", "dynamic"), f"Unknown mode {mode}"
     setup = dict(Nx=256, Nmu=64, r=5, n_domains=n_domains, seed=0)
     run = dict(t_f=0.2, dt=1e-3, tol_sing_val=1e-5, drop_tol=1e-5, snap_every=10)
     if mode != "even":
         # One-sided beam: the left subdomains need a higher rank, the cost differs
         run["inflow"] = beam_inflow
 
-    def run_mpi(get_slice):
+    def run_mpi(get_slice, balancer=None):
         """All ranks together with the given distribution, result on rank 0."""
         grids, lr0s, rngs = setup_domains(**setup)
         mine = get_slice()
         comm.Barrier()
         local = integrate_mpi(lr0s[mine], grids[mine], rngs[mine], comm=comm,
-                              progress=False, **run)
+                              progress=False, balancer=balancer, **run)
         return gather_result(comm, local)
 
     results = {"even": run_mpi(lambda: domain_slice(n_domains, comm))}
-    if mode != "even":
+    if mode == "dynamic":
+        from DLR_rt.src.balancer import Balancer
+        # Deliberately bad start (one domain per rank, the last gets the rest), so the
+        # balancer has to migrate subdomains, the result must still be bit-identical
+        start = [*range(size), n_domains]
+        bal = Balancer(comm, start, every=5, weights="measured")
+        results["dynamic"] = run_mpi(lambda: slice(start[rank], start[rank + 1]), bal)
+        if rank == 0:
+            print(f"dynamic: {bal.summary()['n_changes']} changes, {bal.n_moved} moved, "
+                  f"final bounds {bal.bounds}")
+    elif mode != "even":
         # Weights from the even run, computed on rank 0 and the same on every rank
         weights = comm.bcast(measured_weights(results["even"]) if rank == 0 else None,
                              root=0)
@@ -332,8 +388,7 @@ if __name__ == "__main__":
                          and all(map(np.array_equal, res.snap_f, ser.snap_f))
                          and res.rank_hist == ser.rank_hist)
             all_identical = all_identical and identical
-            busy = [sum(s for k, s in tim.items() if k != "exchange")
-                    for tim in res.timings_per_rank()]
+            busy = res.rank_busy  # per rank, correct also if subdomains migrated
             print(f"\n{name}: {size} ranks, {n_domains} domains "
                   f"{[res.owner.count(i) for i in range(size)]}, "
                   f"bit-identical to serial: {identical}, "

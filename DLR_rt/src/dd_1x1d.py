@@ -73,6 +73,10 @@ class RunResult:
     runtime: float = 0.0  # wall time of the time loop in seconds
     owner: list[int] = field(default_factory=list)  # MPI: [domain] -> rank
     rank_timings: list[dict] = field(default_factory=list)  # MPI: [rank] -> exchange
+    # MPI: [rank] -> time in block_step. With dynamic balancing the subdomains (and
+    # their timers) move between ranks, then only this is the busy time of a rank
+    rank_busy: list[float] = field(default_factory=list)
+    balance: dict = field(default_factory=dict)  # MPI: Balancer.summary(), if used
 
     @property
     def n_domains(self) -> int:

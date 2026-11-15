@@ -11,6 +11,7 @@ final_ranks --> are the numbers in the rank snapshows corresponding to the low-r
     mpirun -n 8 python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling weak
     mpirun -n 4 python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling domains
     mpirun -n 8 python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling asymmetric
+    mpirun -n 8 python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling balanced --n_domains 32
     python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling plot strong --inflow beam --Nx 512
                                                          (only plot, same --inflow/--Nx)
     python -m DLR_rt.examples.d1x1.benchmark_mpi_scaling plot compare --Nx 512
@@ -27,6 +28,11 @@ weak:    Nx and n_domains grow with p, the work per rank stays the same.
 domains: fixed number of ranks, more and more domains per rank.
 asymmetric: fixed Nx and ranks, one domain per rank. Even split vs. more ranks at the
          physical boundaries vs. more ranks in the middle (smaller domains there).
+balanced: fixed Nx and n_domains > p. Even split vs. balanced split of the domains onto
+         the ranks (weights from the 1-rank run, dd_mpi.balanced_bounds), for every p.
+dynamic: like balanced, but the split is recomputed during the run every --every steps
+         and the subdomains migrate (balancer.Balancer), vs. the static even split.
+         mpirun -n 8 ... dynamic --n_domains 32 --every 10 50 200
 
 Results are saved per inflow and Nx (Nx per rank for weak):
     data/benchmarks/strong_beam_Nx512.json, plots/bench_strong_beam_Nx512.png
@@ -43,6 +49,7 @@ os.environ["MKL_NUM_THREADS"] = "1"
 
 import argparse
 import json
+import math
 from functools import partial
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -53,6 +60,7 @@ from mpi4py import MPI
 
 
 from DLR_rt.src import plotting as P
+from DLR_rt.src.balancer import Balancer
 from DLR_rt.src.dd_1x1d import (
     RunResult,
     beam_inflow,
@@ -60,7 +68,17 @@ from DLR_rt.src.dd_1x1d import (
     setup_domains,
     two_beam_inflow,
 )
-from DLR_rt.src.dd_mpi import domain_slice, gather_result, integrate_mpi
+from DLR_rt.src.dd_mpi import (
+    balanced_bounds,
+    balanced_bounds_brute,
+    block_imbalance,
+    domain_slice,
+    even_bounds,
+    gather_result,
+    integrate_mpi,
+    measured_weights,
+    model_weights,
+)
 from DLR_rt.src.sysinfo import print_system_info, system_info
 
 DATA_DIR = Path(__file__).resolve().parents[3] / "data" / "benchmarks"
@@ -91,12 +109,21 @@ def cpu_mhz() -> float:
 
 def tag(args) -> str:
     """Name part of all result files, e.g. 'beam_Nx512' (Nx per rank for weak)."""
-    return f"{args.inflow}_Nx{args.Nx}"
+    name = f"{args.inflow}_Nx{args.Nx}"
+    if {"balanced", "dynamic"} & {args.experiment, args.plot_experiment}:
+        name += f"_{args.weights}" + (f"_n{args.n_domains}" if args.n_domains else "")
+    return name
 
 
-def run(p: int , Nx: int, n_domains: int, args, sizes=None) -> RunResult | None:
-    """ 
+def run(p: int , Nx: int, n_domains: int, args, sizes=None,
+        bounds: list[int] | None = None, balance: dict | None = None) -> RunResult | None:
+    """
     Run on the first p ranks: a short warm-up, then args.repeat timed runs.
+
+    bounds: rank k gets the subdomains bounds[k]:bounds[k+1] (same on all ranks),
+    default is the even split of domain_slice.
+    balance: dynamic load balancing, keyword arguments of Balancer (every, weights),
+    starts from bounds. A new Balancer for every run.
 
     Returns the fastest RunResult on global rank 0, with all runtimes and the clock
     of every rank in .extra, None on all other ranks.
@@ -106,14 +133,18 @@ def run(p: int , Nx: int, n_domains: int, args, sizes=None) -> RunResult | None:
     best = None
     if sub != MPI.COMM_NULL:
         dt = args.cfl / Nx  # dx = 1 / (Nx + 1), so dt <= cfl * dx
-        
+        if bounds is not None:
+            assert len(bounds) == p + 1 and bounds[-1] == n_domains, "Invalid bounds"
+
         def once(t_f):
             grids, lr0s, rngs = setup_domains(Nx, args.Nmu, args.r, n_domains, args.seed, sizes=sizes)
-            mine = domain_slice(n_domains, sub)
+            start = bounds if bounds is not None else even_bounds(n_domains, p)
+            mine = slice(start[sub.Get_rank()], start[sub.Get_rank() + 1])
+            bal = Balancer(sub, start, **balance) if balance else None
             sub.Barrier()
             return integrate_mpi(lr0s[mine], grids[mine], rngs[mine], t_f, dt, sub,
                                  args.tol, args.tol, progress=False,
-                                 inflow=INFLOWS[args.inflow])
+                                 inflow=INFLOWS[args.inflow], balancer=bal)
 
         # Warm-up, a few steps are enough: caching matrices, BLAS setup, MPI connections
         once(min(args.t_f, 20 * dt))
@@ -176,7 +207,11 @@ def summary(res: RunResult, p: int, Nx: int, n_domains: int) -> dict:
     The numbers of one run that are needed for scaling plots
     """
     per_rank = res.timings_per_rank()
-    busy = [sum(s for k, s in tim.items() if k != "exchange") for tim in per_rank]
+    # Time in block_step per rank. The subdomain timers would be wrong with dynamic
+    # balancing (they move with the subdomain), fallback for results without it
+    busy = res.rank_busy or [sum(s for k, s in tim.items()
+                                 if k not in ("exchange", "rebalance"))
+                             for tim in per_rank]
     steps = len(res.time) - 1
     every = max(1, steps // 200)  # enough points for a plot over time
     imbalance = max(busy) / np.mean(busy)  # 1 = all ranks equally busy
@@ -188,6 +223,8 @@ def summary(res: RunResult, p: int, Nx: int, n_domains: int) -> dict:
         p=p, Nx=Nx, n_domains=n_domains, steps=steps,
         runtime=res.runtime, time_per_step=res.runtime / steps,
         busy=busy, exchange=[tim.get("exchange", 0.0) for tim in per_rank],
+        rebalance=[tim.get("rebalance", 0.0) for tim in res.rank_timings],
+        balancer=res.balance or None,
         imbalance=imbalance, balance=balance,
         final_ranks=[h[-1] for h in res.rank_hist],
         domains_per_rank=[res.owner.count(i) for i in range(p)],
@@ -306,6 +343,183 @@ def asymmetric(args) -> list[dict]:
             plot_details(res, f"bench_asymmetric_{layout}_{tag(args)}_p{p}")
     return records
 
+def balanced(args) -> list[dict]:
+    """
+    Even vs. balanced split of the same decomposition (n_domains > p), for every p.
+
+    1. p = 1: reference for the speedup and the bit-identity check. Its busy time per
+       subdomain gives the weights, the cost of a subdomain does not depend on which
+       rank computes it (--weights model: cost model with the ranks of this run).
+    2. For every p > 1: even split (domain_slice) and balanced split (balanced_bounds,
+       smallest maximum block sum of the weights). The result is bit-identical,
+       only the distribution of the subdomains differs.
+    """
+    n_domains = args.n_domains or 2 * max(args.ranks)
+    ref = run(1, args.Nx, n_domains, args)
+    weights = None
+    if ref is not None:
+        weights = (measured_weights(ref) if args.weights == "measured"
+                   else model_weights(ref.grids, ref.rank_hist))
+    weights = world.bcast(weights, root=0)  # same weights, so same bounds on every rank
+
+    records = []
+    if ref is not None:
+        rec = summary(ref, 1, args.Nx, n_domains)
+        rec.update(split="even", bounds=[0, n_domains], predicted_imbalance=1.0,
+                   identical=True, weights=list(map(float, weights)))
+        records.append(rec)
+
+    for p in [p for p in args.ranks if p > 1]:
+        splits = {"even": even_bounds(n_domains, p),
+                  "balanced": balanced_bounds(weights, p)}
+        for split, bounds in splits.items():
+            if split == "balanced" and bounds == splits["even"]:
+                # Nothing to balance, the run would be the same (same on all ranks)
+                if world.Get_rank() == 0:
+                    records.append({**records[-1], "split": "balanced"})
+                continue
+            res = run(p, args.Nx, n_domains, args, bounds=bounds)
+            if res is None:
+                continue
+            rec = summary(res, p, args.Nx, n_domains)
+            rec.update(split=split, bounds=bounds,
+                       predicted_imbalance=block_imbalance(weights, bounds),
+                       identical=bool(np.array_equal(res.f(), ref.f())
+                                      and res.rank_hist == ref.rank_hist))
+            if split == "balanced" and math.comb(n_domains - 1, p - 1) <= 200_000:
+                # Bisection has to reach the optimum of the brute force
+                brute = block_imbalance(weights, balanced_bounds_brute(weights, p))
+                rec["optimal"] = bool(np.isclose(rec["predicted_imbalance"], brute))
+            records.append(rec)
+            if p == max(args.ranks):
+                plot_details(res, f"bench_balanced_{split}_{tag(args)}_p{p}")
+
+    if world.Get_rank() == 0:
+        print(f"\n{'p':>3} {'even ms':>8} {'bal. ms':>8} {'gain':>6} "
+              f"{'imb. even':>10} {'imb. bal.':>10} {'predicted':>10}  bounds")
+        for ev, ba in zip(records[1::2], records[2::2]):
+            print(f"{ev['p']:>3} {ev['time_per_step'] * 1e3:>8.2f} "
+                  f"{ba['time_per_step'] * 1e3:>8.2f} "
+                  f"{ev['time_per_step'] / ba['time_per_step']:>5.2f}x "
+                  f"{ev['imbalance']:>10.2f} {ba['imbalance']:>10.2f} "
+                  f"{ev['predicted_imbalance']:>4.2f}/{ba['predicted_imbalance']:<5.2f}"
+                  f"  {ba['bounds']}")
+    return records
+
+
+def plot_balanced(records: list[dict], name: str):
+    """Speedup and imbalance of the even vs. the balanced split, vs. p."""
+    t1 = records[0]["time_per_step"]  # p = 1, same for both splits
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
+    for i, (split, marker) in enumerate([("even", "o"), ("balanced", "s")]):
+        recs = [records[0]] + [r for r in records[1:] if r["split"] == split]
+        p = np.array([r["p"] for r in recs])
+        t = np.array([r["time_per_step"] for r in recs])
+        axes[0].plot(p, t1 / t, f"C{i}", marker=marker, label=f"{split} split")
+        axes[1].plot(p, [r["imbalance"] for r in recs], f"C{i}", marker=marker,
+                     label=f"{split}, measured")
+        axes[1].plot(p, [r["predicted_imbalance"] for r in recs], f"C{i}", ls=":",
+                     marker=marker, mfc="none", label=f"{split}, predicted from weights")
+    axes[0].plot(p, p, "k--", lw=1, label="ideal")
+    axes[0].set(xlabel="MPI ranks $p$", ylabel="speedup vs. 1 rank", xticks=p,
+                title=f"Nx = {records[0]['Nx']}, {records[0]['n_domains']} domains")
+    axes[1].axhline(1.0, color="k", ls="--", lw=1)
+    axes[1].set(xlabel="MPI ranks $p$", ylabel="max busy / mean busy", xticks=p,
+                ylim=(0.95, None), title="Load imbalance")
+    for ax in axes:
+        ax.legend(fontsize=8)
+    print(f"Saved {P.save_fig(fig, f'bench_balanced_{name}')}")
+
+
+def dynamic(args) -> list[dict]:
+    """
+    Even static split vs. dynamic load balancing (balancer.Balancer), for every p.
+
+    The dynamic runs start from the even split and repartition every `every` steps
+    (one run per value of --every). p = 1 is the reference for the speedup and the
+    bit-identity check, the subdomains only change their owner, never the result.
+    """
+    n_domains = args.n_domains or 2 * max(args.ranks)
+    ref = run(1, args.Nx, n_domains, args)
+    records = []
+    if ref is not None:
+        rec = summary(ref, 1, args.Nx, n_domains)
+        rec.update(split="even", identical=True)
+        records.append(rec)
+
+    for p in [p for p in args.ranks if p > 1]:
+        variants = {"even": None}
+        variants.update({f"dynamic {e}": dict(every=e, weights=args.weights)
+                         for e in args.every})
+        for split, balance in variants.items():
+            res = run(p, args.Nx, n_domains, args, balance=balance)
+            if res is None:
+                continue
+            rec = summary(res, p, args.Nx, n_domains)
+            rec.update(split=split,
+                       identical=bool(np.array_equal(res.f(), ref.f())
+                                      and res.rank_hist == ref.rank_hist))
+            records.append(rec)
+
+    if world.Get_rank() == 0:
+        print(f"\n{'p':>3} {'variant':>12} {'ms/step':>8} {'gain':>6} {'imbalance':>10} "
+              f"{'changes':>8} {'moved':>6} {'rebalance':>10}  final bounds")
+        even = {}
+        for rec in records[1:]:
+            even.setdefault(rec["p"], rec["time_per_step"])
+            bal = rec["balancer"] or {}
+            share = max(rec["rebalance"]) / rec["runtime"] * 100 if bal else 0.0
+            final = bal["history"][-1][1] if bal else "-"
+            print(f"{rec['p']:>3} {rec['split']:>12} {rec['time_per_step'] * 1e3:>8.2f} "
+                  f"{even[rec['p']] / rec['time_per_step']:>5.2f}x "
+                  f"{rec['imbalance']:>10.2f} {bal.get('n_changes', '-'):>8} "
+                  f"{bal.get('n_moved', '-'):>6} {share:>9.1f}%  {final}")
+    return records
+
+
+def plot_dynamic(records: list[dict], name: str):
+    """Speedup and imbalance of the even split vs. dynamic balancing, and the owner of
+    every subdomain over time (largest p, most frequent rebalancing)."""
+    t1 = records[0]["time_per_step"]  # p = 1, the same for all variants
+    splits = list(dict.fromkeys(r["split"] for r in records[1:]))
+    fig, axes = plt.subplots(1, 3, figsize=(17, 4.5))
+    markers = ["o", "s", "^", "D", "v"]
+    for i, split in enumerate(splits):
+        recs = [records[0]] + [r for r in records[1:] if r["split"] == split]
+        p = np.array([r["p"] for r in recs])
+        t = np.array([r["time_per_step"] for r in recs])
+        label = "even split (static)" if split == "even" else \
+            f"dynamic, every {split.split()[1]} steps"
+        axes[0].plot(p, t1 / t, f"C{i}", marker=markers[i % 5], label=label)
+        axes[1].plot(p, [r["imbalance"] for r in recs], f"C{i}", marker=markers[i % 5],
+                     label=label)
+    axes[0].plot(p, p, "k--", lw=1, label="ideal")
+    axes[0].set(xlabel="MPI ranks $p$", ylabel="speedup vs. 1 rank", xticks=p,
+                title=f"Nx = {records[0]['Nx']}, {records[0]['n_domains']} domains")
+    axes[1].axhline(1.0, color="k", ls="--", lw=1)
+    axes[1].set(xlabel="MPI ranks $p$", ylabel="max busy / mean busy", xticks=p,
+                ylim=(0.95, None), title="Load imbalance")
+
+    dyn = [r for r in records if r.get("balancer")]
+    if dyn:
+        p_max = max(r["p"] for r in dyn)
+        rec = min((r for r in dyn if r["p"] == p_max), key=lambda r: r["balancer"]["every"])
+        hist = rec["balancer"]["history"]
+        t = [h[0] for h in hist] + [rec["t_hist"][-1]]
+        bounds = np.array([h[1] for h in hist] + [hist[-1][1]])
+        for k in range(1, p_max):  # inner bounds, the outer ones are 0 and n
+            axes[2].step(t, bounds[:, k], where="post", color="C0", lw=1.5)
+        axes[2].set(xlabel="$t$", ylabel="subdomain index", ylim=(0, rec["n_domains"]),
+                    title=f"Rank boundaries over time, p = {p_max}, every "
+                          f"{rec['balancer']['every']} steps "
+                          f"({rec['balancer']['n_moved']} moves)")
+    else:
+        axes[2].set_visible(False)
+    for ax in axes[:2]:
+        ax.legend(fontsize=8)
+    print(f"Saved {P.save_fig(fig, f'bench_dynamic_{name}')}")
+
+
 def plot_asymmetric(records: list[dict], name: str):
     """Balance E(t) and busy time per MPI rank of all layouts of 'asymmetric'."""
     styles = ["-", "--", ":"]  # layouts stay apart without colour as well
@@ -333,6 +547,12 @@ def plot_summary(experiment: str, records: list[dict], name: str):
     """Scaling plots of one experiment, name is the file tag, e.g. 'beam_Nx512'."""
     if experiment == "asymmetric":
         plot_asymmetric(records, name)
+        return
+    if experiment == "balanced":
+        plot_balanced(records, name)
+        return
+    if experiment == "dynamic":
+        plot_dynamic(records, name)
         return
 
     p = np.array([rec["p"] for rec in records])
@@ -425,14 +645,16 @@ def print_table(records: list[dict]):
               f"{t1 / rec['time_per_step']:>8.2f} "
               f"{rec['imbalance']:>10.2f} {rec['balance']:>6.2f} "
               f"{str(rec.get('identical', '-')):>10}  "
-              f"{rec['domains_per_rank']}, {rec['final_ranks']}  {rec.get('layout', '')}")
+              f"{rec['domains_per_rank']}, {rec['final_ranks']}  "
+              f"{rec.get('layout') or rec.get('split', '')}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("experiment",
-                        choices=["strong", "weak", "domains", "asymmetric", "plot"])
+                        choices=["strong", "weak", "domains", "asymmetric", "balanced",
+                                 "dynamic", "plot"])
     parser.add_argument("plot_experiment", nargs="?", help="for 'plot': which one")
     parser.add_argument("--Nx", type=int, default=512, help="(per rank for weak)")
     parser.add_argument("--Nmu", type=int, default=64)
@@ -445,7 +667,14 @@ if __name__ == "__main__":
     parser.add_argument("--repeat", type=int, default=1, help="take the fastest run")
     parser.add_argument("--ranks", type=int, nargs="+", help="default 1, 2, 4, ... <= size")
     parser.add_argument("--n_domains", type=int,
-                        help="strong: total (default max ranks), weak: per rank")
+                        help="strong: total (default max ranks), weak: per rank, "
+                             "balanced/dynamic: total (default 2 * max ranks)")
+    parser.add_argument("--weights", choices=["measured", "model"], default="measured",
+                        help="balanced: busy time per subdomain of the 1-rank run, "
+                             "dynamic: since the last rebalance, "
+                             "or the cost model (Nx + Nmu) r^2 + r^3")
+    parser.add_argument("--every", type=int, nargs="+", default=[50],
+                        help="dynamic: rebalance every ... steps, one run per value")
     parser.add_argument("--domains", type=int, nargs="+", help="for 'domains'")
     args = parser.parse_args()
 
@@ -470,7 +699,8 @@ if __name__ == "__main__":
             print_system_info(info)
 
         experiment = {"strong": strong, "weak": weak, "domains": domains,
-                      "asymmetric": asymmetric}[args.experiment]
+                      "asymmetric": asymmetric, "balanced": balanced,
+                      "dynamic": dynamic}[args.experiment]
         records = experiment(args)
 
         if world.Get_rank() == 0:
