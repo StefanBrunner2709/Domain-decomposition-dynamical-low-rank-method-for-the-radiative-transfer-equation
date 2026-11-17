@@ -1,17 +1,21 @@
 """
-Reference results for test_dd_1x1d.py, created with the old scripts.
+Reference results for the 1x1d tests, created with the old scripts.
 
 The reference in data/reference_dd_1x1d.npz is frozen. The old two-domain script
 dlr_dd.py has been removed, so to regenerate it restore that file first:
     git show a2371fc:DLR_rt/examples/d1x1/dlr_dd.py > DLR_rt/examples/d1x1/dlr_dd.py
     python -m DLR_rt.tests.make_reference
-The constants below are also imported by test_dd_1x1d.py.
+The constants below are also imported by test_lowrank_1x1d and test_domains_1x1d.
 """
 from pathlib import Path
 
 import numpy as np
 
-from DLR_rt.src.dd_1x1d import full_f, setup_domains
+from DLR_rt.src.d1x1.domains import setup_domains
+
+
+def full_f(lr) -> np.ndarray:
+    return lr.U @ lr.S @ lr.V.T
 
 # Small and short, but long enough that the rank changes in both runs
 NX, NMU, R, T_F, DT, TOL, SEED = 256, 32, 5, 0.2, 1e-3, 1e-5, 0

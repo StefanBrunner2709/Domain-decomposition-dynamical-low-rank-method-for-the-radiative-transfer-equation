@@ -8,16 +8,27 @@ No simulation is run, only the saved data in data/benchmarks/ is plotted:
 
     python -m DLR_rt.examples.d1x1.replot_presentation
 """
+import io
 import pickle
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-import DLR_rt.src.plotting as P
-from DLR_rt.src.dd_1x1d import setup_domains
+import DLR_rt.src.d1x1.plotting as P
+from DLR_rt.src.d1x1.domains import RunResult, setup_domains
+from DLR_rt.src.d1x1.lowrank import LR
 
 DATA_DIR = Path(__file__).resolve().parents[3] / "data" / "benchmarks"
+
+
+class _Unpickler(pickle.Unpickler):
+    """Results pickled before the restructure: the old classes -> the d1x1 ones."""
+    MOVED = {("DLR_rt.src.dd_1x1d", "RunResult"): RunResult,
+             ("DLR_rt.src.lr", "LR"): LR}
+
+    def find_class(self, module, name):
+        return self.MOVED.get((module, name)) or super().find_class(module, name)
 
 # Large enough to read from the back of the room
 STYLE = {"font.size": 18, "axes.titlesize": 24, "axes.labelsize": 24,
@@ -40,7 +51,7 @@ def solution_from_npy(name: str = "tanh_Nx2048", Nx: int = 2048, Nmu: int = 128,
 
 def details_from_pkl(name: str = "domains_tanh_Nx2048_8"):
     """Solution, low rank r per subdomain and time per process, one figure each."""
-    res = pickle.loads((DATA_DIR / f"{name}_result.pkl").read_bytes())
+    res = _Unpickler(io.BytesIO((DATA_DIR / f"{name}_result.pkl").read_bytes())).load()
     out = f"bench_{name}"
 
     fig, ax = plt.subplots(figsize=(8, 6))
