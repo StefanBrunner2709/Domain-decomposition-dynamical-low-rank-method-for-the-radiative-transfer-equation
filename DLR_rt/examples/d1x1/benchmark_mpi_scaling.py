@@ -112,6 +112,8 @@ def tag(args) -> str:
     name = f"{args.inflow}_Nx{args.Nx}"
     if {"balanced", "dynamic"} & {args.experiment, args.plot_experiment}:
         name += f"_{args.weights}" + (f"_n{args.n_domains}" if args.n_domains else "")
+    if args.suffix:  # keep runs with other settings apart, e.g. '_n8_tf05'
+        name += args.suffix
     return name
 
 
@@ -245,7 +247,7 @@ def plot_details(res: RunResult, name: str):
     P.plot_rank_history(axes[0, 1], res)
     P.plot_rank_snapshots(axes[1, 0], res, times=np.linspace(0, res.time[-1], 11))
     P.plot_timings_per_rank(axes[1, 1], res)
-    fig.suptitle(f"{name}: {res.n_domains} domains on {len(res.rank_timings)} ranks, "
+    fig.suptitle(f"{name}: {res.n_domains} domains on {len(res.rank_timings)} processes, "
                  f"Nx = {sum(g.Nx for g in res.grids)}")
     print(f"Saved {P.save_fig(fig, name)}")
 
@@ -421,10 +423,10 @@ def plot_balanced(records: list[dict], name: str):
         axes[1].plot(p, [r["predicted_imbalance"] for r in recs], f"C{i}", ls=":",
                      marker=marker, mfc="none", label=f"{split}, predicted from weights")
     axes[0].plot(p, p, "k--", lw=1, label="ideal")
-    axes[0].set(xlabel="MPI ranks $p$", ylabel="speedup vs. 1 rank", xticks=p,
+    axes[0].set(xlabel="MPI processes $p$", ylabel="speedup vs. 1 process", xticks=p,
                 title=f"Nx = {records[0]['Nx']}, {records[0]['n_domains']} domains")
     axes[1].axhline(1.0, color="k", ls="--", lw=1)
-    axes[1].set(xlabel="MPI ranks $p$", ylabel="max busy / mean busy", xticks=p,
+    axes[1].set(xlabel="MPI processes $p$", ylabel="max busy / mean busy", xticks=p,
                 ylim=(0.95, None), title="Load imbalance")
     for ax in axes:
         ax.legend(fontsize=8)
@@ -498,10 +500,10 @@ def plot_dynamic(records: list[dict], name: str):
         axes[1].plot(p, [r["imbalance"] for r in recs], f"C{i}", marker=markers[i % 5],
                      label=label)
     axes[0].plot(p, p, "k--", lw=1, label="ideal")
-    axes[0].set(xlabel="MPI ranks $p$", ylabel="speedup vs. 1 rank", xticks=p,
+    axes[0].set(xlabel="MPI processes $p$", ylabel="speedup vs. 1 process", xticks=p,
                 title=f"Nx = {records[0]['Nx']}, {records[0]['n_domains']} domains")
     axes[1].axhline(1.0, color="k", ls="--", lw=1)
-    axes[1].set(xlabel="MPI ranks $p$", ylabel="max busy / mean busy", xticks=p,
+    axes[1].set(xlabel="MPI processes $p$", ylabel="max busy / mean busy", xticks=p,
                 ylim=(0.95, None), title="Load imbalance")
 
     dyn = [r for r in records if r.get("balancer")]
@@ -514,7 +516,7 @@ def plot_dynamic(records: list[dict], name: str):
         for k in range(1, p_max):  # inner bounds, the outer ones are 0 and n
             axes[2].step(t, bounds[:, k], where="post", color="C0", lw=1.5)
         axes[2].set(xlabel="$t$", ylabel="subdomain index", ylim=(0, rec["n_domains"]),
-                    title=f"Rank boundaries over time, p = {p_max}, every "
+                    title=f"Process boundaries over time, p = {p_max}, every "
                           f"{rec['balancer']['every']} steps "
                           f"({rec['balancer']['n_moved']} moves)")
     else:
@@ -537,13 +539,14 @@ def plot_asymmetric(records: list[dict], name: str):
                      label=f"{rec['layout']} ({rec['time_per_step'] * 1e3:.2f} ms/step)")
     ranks = range(records[0]["p"])
     axes[0].axhline(1.0, color="k", ls="--", lw=1)
-    axes[0].set(xlabel="$t$", ylabel=r"$\mathcal{E}(t)$ = min / max of the rank load",
-                ylim=(0, 1.05), title="Load balance over time (from the low-rank r)")
-    axes[1].set(xlabel="MPI rank", ylabel="busy time (s)", ylim=(0, None), xticks=ranks,
-                xticklabels=[f"P{i}" for i in ranks], title="Busy time per rank")
+    axes[0].set(xlabel="$t$",
+                ylabel=r"$\mathcal{E}(t)$ = min / max of the summed $r$ per process",
+                ylim=(0, 1.05), title="Load balance over time (from the low rank $r$)")
+    axes[1].set(xlabel="process", ylabel="busy time (s)", ylim=(0, None), xticks=ranks,
+                xticklabels=[f"P{i}" for i in ranks], title="Busy time per process")
     for ax in axes:
         ax.legend(fontsize=8, loc="lower right")
-    fig.suptitle(f"{records[0]['n_domains']} domains on {records[0]['p']} ranks, "
+    fig.suptitle(f"{records[0]['n_domains']} domains on {records[0]['p']} processes, "
                  f"Nx = {records[0]['Nx']}, {name}")
     print(f"Saved {P.save_fig(fig, f'bench_asymmetric_{name}')}")
 
@@ -566,32 +569,32 @@ def plot_summary(experiment: str, records: list[dict], name: str):
 
     if experiment == "strong":
         speedup = t[0] / t
-        axes[0].plot(p, speedup, "o-", label="vs. same decomposition on 1 rank")
+        axes[0].plot(p, speedup, "o-", label="vs. same decomposition on 1 process")
         if records[0].get("speedup_vs_single") is not None:
             speedup_single = np.array([rec["speedup_vs_single"] for rec in records])
-            axes[0].plot(p, speedup_single, "s--", label="vs. 1 domain on 1 rank")
+            axes[0].plot(p, speedup_single, "s--", label="vs. 1 domain on 1 process")
         axes[0].plot(p, p / p[0], "k--", lw=1, label="ideal")
-        axes[0].set(xlabel="MPI ranks $p$", ylabel="speedup", xticks=p,
+        axes[0].set(xlabel="MPI processes $p$", ylabel="speedup", xticks=p,
                     title=f"Strong scaling, Nx = {records[0]['Nx']}, "
                           f"{records[0]['n_domains']} domains")
         # only vs. the same decomposition: vs. 1 domain it would be > 100 %
         axes[1].plot(p, speedup / (p / p[0]) * 100, "o-",
-                     label="vs. same decomposition on 1 rank")
-        axes[1].set(xlabel="MPI ranks $p$", ylabel="parallel efficiency (%)",
+                     label="vs. same decomposition on 1 process")
+        axes[1].set(xlabel="MPI processes $p$", ylabel="parallel efficiency (%)",
                     xticks=p, ylim=(0, 110), title="Efficiency")
     elif experiment == "weak":
         axes[0].plot(p, t, "o-", label="measured")
         axes[0].axhline(t[0], color="k", ls="--", lw=1, label="ideal")
-        axes[0].set(xlabel="MPI ranks $p$", ylabel="time per step (ms)", xticks=p,
-                    ylim=(0, None), title=f"Weak scaling, Nx = {records[0]['Nx']} per rank")
+        axes[0].set(xlabel="MPI processes $p$", ylabel="time per step (ms)", xticks=p,
+                    ylim=(0, None), title=f"Weak scaling, Nx = {records[0]['Nx']} per process")
         axes[1].plot(p, imbalance, "o-")
-        axes[1].set(xlabel="MPI ranks $p$", ylabel="max busy / mean busy",
+        axes[1].set(xlabel="MPI processes $p$", ylabel="max busy / mean busy",
                     xticks=p, title="Load imbalance")
     else:
         n = np.array([rec["n_domains"] for rec in records])
         axes[0].plot(n, t, "o-")
         axes[0].set(xlabel="number of domains", ylabel="time per step (ms)", xticks=n,
-                    ylim=(0, None), title=f"{p[0]} ranks, Nx = {records[0]['Nx']}")
+                    ylim=(0, None), title=f"{p[0]} processes, Nx = {records[0]['Nx']}")
         axes[1].plot(n, imbalance, "o-")
         axes[1].set(xlabel="number of domains", ylabel="max busy / mean busy",
                     xticks=n, title="Load imbalance")
@@ -625,15 +628,17 @@ def plot_compare(Nx: int):
                   f"{records[0]['time_per_step'] / rec['time_per_step']:>8.2f}  "
                   f"{rec['final_ranks']}")
     ax.axhline(1.0, color="k", ls="--", lw=1)
-    ax.set(xlabel="$t$", ylabel="max / mean of the rank load", ylim=(0.95, None),
-           title="Load imbalance over time (from the low-rank r, not measured time)")
+    ax.set(xlabel="$t$", ylabel="max / mean of the summed $r$ per process",
+           ylim=(0.95, None),
+           title="Load imbalance over time (from the low rank $r$, not measured time)")
     ax.legend(fontsize=8)
     print(f"Saved {P.save_fig(fig, f'bench_compare_inflows_Nx{Nx}')}")
 
     ax_E.axhline(1.0, color="k", ls="--", lw=1)
-    ax_E.set(xlabel="$t$", ylabel=r"$\mathcal{E}(t)$ = min / max of the rank load",
+    ax_E.set(xlabel="$t$",
+             ylabel=r"$\mathcal{E}(t)$ = min / max of the summed $r$ per process",
              ylim=(0, 1.05),
-             title="Load balance over time (from the low-rank r, not measured time)")
+             title="Load balance over time (from the low rank $r$, not measured time)")
     ax_E.legend(fontsize=8, loc="lower right")
     print(f"Saved {P.save_fig(fig_E, f'bench_compare_balance_Nx{Nx}')}")
 
@@ -680,6 +685,8 @@ if __name__ == "__main__":
     parser.add_argument("--min_gain", type=float, default=0.05,
                         help="dynamic: migrate only if the slowest rank gets this "
                              "fraction faster (hysteresis against flip-flopping)")
+    parser.add_argument("--suffix", default="",
+                        help="appended to all result file names (also for 'plot')")
     parser.add_argument("--every", type=int, nargs="+", default=[50],
                         help="dynamic: rebalance every ... steps, one run per value")
     parser.add_argument("--domains", type=int, nargs="+", help="for 'domains'")

@@ -115,7 +115,7 @@ def plot_comparison(ser: RunResult, mpi: RunResult, single: RunResult,
     ax = axes[0, 0]
     im = ax.imshow(mpi.f().T, extent=extent, origin="lower", aspect=0.5)
     mark_interfaces(ax)
-    ax.set_title(f"(a) MPI, {size} ranks, {mpi.n_domains} domains, $t=${T_F}")
+    ax.set_title(f"(a) MPI, {size} processes, {mpi.n_domains} domains, $t=${T_F}")
     ax.set_xlabel("$x$")
     ax.set_ylabel(r"$\mu$")
     fig.colorbar(im, ax=ax)
@@ -155,11 +155,11 @@ def plot_comparison(ser: RunResult, mpi: RunResult, single: RunResult,
         ax.plot(ser.time, r_ser, color=f"C{i}", lw=4, alpha=0.4,
                 label=f"serial, domain {i}")
         ax.plot(mpi.time, r_mpi, "--", color=f"C{i}", lw=1.5,
-                label=f"MPI, domain {i} (rank {mpi.owner[i]})")
+                label=f"MPI, domain {i} (process P{mpi.owner[i]})")
     ax.plot(single.time, single.rank_hist[0], ":", color="grey", label="one domain")
     ax.set_xlabel("$t$")
-    ax.set_ylabel("rank $r(t)$")
-    ax.set_title("(d) Rank history")
+    ax.set_ylabel("low rank $r(t)$")
+    ax.set_title("(d) Low rank history")
     ax.legend(fontsize=8)
 
     fig.tight_layout()

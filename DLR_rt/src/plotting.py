@@ -1,5 +1,8 @@
 """
 Shared plots for the 1x1d domain decomposition, saved as PNG in plots/.
+
+Wording in all plot labels: "rank" only means the low rank r of a subdomain.
+An MPI rank is called a "process" (P0, P1, ...), so the two never get mixed up.
 """
 
 from pathlib import Path
@@ -75,8 +78,8 @@ def plot_rank_history(ax, res: RunResult, max_legend: int = 8):
 
     for i, (hist, c) in enumerate(zip(res.rank_hist, colors)):
         ax.step(res.time, hist, where="post", color=c, lw=1.2, label=f"domain {i}")
-    ax.set(xlabel="$t$", ylabel="rank $r(t)$", xlim=(res.time[0], res.time[-1]),
-           title="Rank per subdomain")
+    ax.set(xlabel="$t$", ylabel="low rank $r(t)$", xlim=(res.time[0], res.time[-1]),
+           title="Low rank $r$ per subdomain")
     ax.yaxis.set_major_locator(MaxNLocator(integer=True))
     if n <= max_legend:
         ax.legend(fontsize=8)
@@ -127,7 +130,7 @@ def plot_rank_snapshots(ax, res: RunResult, times, annotate: bool | None = None)
     ax.set_xticks(range(n))
     ax.set_yticks(range(n_t), [f"{t:.2f}" for t in t_snap])
     ax.set(xlabel="subdomain", ylabel="$t$")
-    cbar = ax.figure.colorbar(im, ax=ax, label="rank")
+    cbar = ax.figure.colorbar(im, ax=ax, label="low rank $r$")
     cbar.set_ticks(np.arange(R.min(), R.max() + 1))
 
 
@@ -182,7 +185,7 @@ def plot_reassignment(res: RunResult, max_points: int = 400):
     cmap = plt.get_cmap("tab20" if p > 10 else "tab10", p)
     im = axes[0].pcolormesh(t_edges, d_edges, O.T, cmap=cmap, shading="flat",
                             norm=BoundaryNorm(np.arange(p + 1) - 0.5, p))
-    cbar = fig.colorbar(im, ax=axes[0], label="MPI rank")
+    cbar = fig.colorbar(im, ax=axes[0], label="process")
     cbar.set_ticks(range(p), labels=[f"P{k}" for k in range(p)])
     for tc in t_change:  # times where the split changed
         axes[0].axvline(tc, color="k", lw=0.6, ls=":", alpha=0.6)
@@ -194,11 +197,11 @@ def plot_reassignment(res: RunResult, max_points: int = 400):
     r_bounds = np.arange(R.min(), R.max() + 2) - 0.5
     im = axes[1].pcolormesh(t_edges, d_edges, R.T, cmap="viridis", shading="flat",
                             norm=BoundaryNorm(r_bounds, plt.cm.viridis.N))
-    fig.colorbar(im, ax=axes[1], label="rank $r$")
+    fig.colorbar(im, ax=axes[1], label="low rank $r$")
     for k in range(1, p):
         axes[1].step(t_steps, bounds[:, k] - 0.5, where="post", color="w", lw=1.5)
     axes[1].set(xlabel="$t$", ylabel="subdomain",
-                title="(b) Low-rank $r$ and rank boundaries (white)")
+                title="(b) Low rank $r$ and process boundaries (white)")
     for ax in axes[:2]:
         ax.yaxis.set_major_locator(MaxNLocator(integer=True))
 
@@ -212,11 +215,11 @@ def plot_reassignment(res: RunResult, max_points: int = 400):
         axes[2].plot(t, load.max(axis=1) / load.mean(axis=1), f"C{1 - i}", ls=style,
                      lw=2, label=label)
     axes[2].axhline(1.0, color="k", ls=":", lw=1)
-    axes[2].set(xlabel="$t$", ylabel="max / mean of the summed $r$ per rank",
+    axes[2].set(xlabel="$t$", ylabel="max / mean of the summed $r$ per process",
                 ylim=(0.95, None), title="(c) Load imbalance over time")
     axes[2].legend(fontsize=9)
 
-    fig.suptitle(f"Dynamic load balancing: {n} subdomains on {p} ranks, "
+    fig.suptitle(f"Dynamic load balancing: {n} subdomains on {p} processes, "
                  f"Nx = {sum(g.Nx for g in res.grids)}, weights {bal['weights']}")
     fig.tight_layout()
     return fig
@@ -237,7 +240,7 @@ def plot_timings_per_rank(ax, res: RunResult):
                color=f"C{PHASES.index(phase)}", edgecolor="w", linewidth=1)
         bottom += values
     ax.set_xticks(x, [f"P{p}" for p in x])
-    ax.set(xlabel="MPI rank", ylabel="time (s)", title="Measured time per rank")
+    ax.set(xlabel="process", ylabel="time (s)", title="Measured time per process")
     ax.legend(fontsize=8)
 
 

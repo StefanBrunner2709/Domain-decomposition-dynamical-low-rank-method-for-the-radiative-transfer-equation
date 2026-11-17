@@ -183,40 +183,39 @@ def slope(x, y) -> float:
 
 
 def plot(out: dict):
-    fig, ax = plt.subplots(2, 2, figsize=(12, 9))
-    ctrl = out["D"]["rel_l2"]
+    """DD error vs. number of subdomains and over time (relative L2 vs. 1 domain)."""
+    plt.rcParams.update({"font.size": 13})
+    fig, ax = plt.subplots(1, 2, figsize=(13, 4.8))
+    settings = (f"Nx = {BASE['Nx']}, N$_\\mu$ = {BASE['Nmu']}, tol = {BASE['tol']:.0e}, "
+                f"$t_f$ = {BASE['t_f']}")
 
+    # (a) Error at t_f against the number of subdomains
     b = out["B_domains"]
-    ax[0, 0].plot([r["n_domains"] for r in b], [r["rel_l2"] for r in b], "o-")
-    ax[0, 0].set_xscale("log", base=2)  # only x in base 2, the error in base 10
-    ax[0, 0].set_yscale("log")
-    ax[0, 0].set(xlabel="number of subdomains", ylabel="rel. $L^2$ error vs 1 domain",
-                 title="(a) DD error vs subdomains")
+    n = [r["n_domains"] for r in b]
+    err = [r["rel_l2"] for r in b]
+    ax[0].plot(n, err, "o-", ms=7, lw=2)
+    ax[0].set_xscale("log", base=2)
+    ax[0].set_xticks(n, [str(k) for k in n])  # 2, 4, 8, 16 instead of 2^1, ...
+    ax[0].minorticks_off()
+    ax[0].set_yscale("log")
+    # One decade around the data, so the (small) growth with n is not exaggerated
+    lo = 10 ** np.floor(np.log10(min(err)))
+    ax[0].set_ylim(lo, 10 * lo)
+    ax[0].set(xlabel="number of subdomains", ylabel="rel. $L^2$ error vs. 1 domain",
+              title=f"(a) DD error at $t_f$ = {BASE['t_f']}")
 
-    b = out["B_tol"]
-    ax[0, 1].loglog([r["tol"] for r in b], [r["rel_l2"] for r in b], "o-")
-    ax[0, 1].invert_xaxis()
-    ax[0, 1].set(xlabel="tolerance", ylabel="rel. $L^2$ error",
-                 title=f"(b) DD error vs tolerance ({N_SWEEP} domains)")
+    # (b) Error over time for N_SWEEP subdomains (t = 0 is exactly 0, left out)
+    rec = next(r for r in b if "t" in r)
+    t = [ti for ti, e in zip(rec["t"], rec["rel_l2_t"]) if e]
+    e = [e for e in rec["rel_l2_t"] if e]
+    ax[1].semilogy(t, e, lw=2)
+    ax[1].set_xlim(0, BASE["t_f"])
+    ax[1].set(xlabel="$t$", ylabel="rel. $L^2$ error vs. 1 domain",
+              title=f"(b) DD error over time, {N_SWEEP} subdomains")
 
-    for tol in sorted({r.get("tol", BASE["tol"]) for r in out["B_dt"]}, reverse=True):
-        b = [r for r in out["B_dt"] if r.get("tol", BASE["tol"]) == tol]
-        dt, err = [r["dt"] for r in b], [r["rel_l2"] for r in b]
-        ax[1, 0].loglog(dt, err, "o-", label=f"tol {tol:.0e}, slope {slope(dt, err):.2f}")
-    ax[1, 0].set(xlabel=r"$\Delta t$", ylabel="rel. $L^2$ error",
-                 title=f"(c) DD error vs time step ({N_SWEEP} domains)")
-
-    rec = next(r for r in out["B_domains"] if "t" in r)
-    t = [ti for ti, e in zip(rec["t"], rec["rel_l2_t"]) if e is not None]
-    e = [e for e in rec["rel_l2_t"] if e is not None]
-    ax[1, 1].semilogy(t, e, label=f"DD, {N_SWEEP} domains")
-    ax[1, 1].set(xlabel="$t$", ylabel="rel. $L^2$ error",
-                 title="(d) DD error over time")
-
-    for a in ax.flat:
-        a.axhline(ctrl, color="r", ls=":", lw=1, label="no exchange (control)")
+    for a in ax:
         a.grid(True, which="both", alpha=0.3)
-        a.legend(fontsize=8)
+    fig.suptitle(settings, fontsize=12)
     fig.tight_layout()
     PLOT_DIR.mkdir(parents=True, exist_ok=True)
     fig.savefig(PLOT_DIR / "correctness.png", dpi=200)
