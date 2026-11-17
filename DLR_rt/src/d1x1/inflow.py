@@ -49,5 +49,6 @@ def two_beam(t: float, mu: np.ndarray, mu_min: float = 0.8, ramp: float = 20.0):
     return left, right
 
 
-INFLOWS = {"tanh": tanh, "beam": beam, "sharp_beam": sharp_beam, "pulse": pulse,
-           "two_beam": two_beam}
+# The order gives the colour of every inflow in the plots, keep it
+INFLOWS = {"tanh": tanh, "beam": beam, "pulse": pulse, "two_beam": two_beam,
+           "sharp_beam": sharp_beam}
