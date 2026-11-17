@@ -13,6 +13,10 @@ from time import perf_counter
 import numpy as np
 from tqdm import tqdm
 
+# Moved to d1x1/inflow.py, old names kept until this module is replaced by d1x1/
+from DLR_rt.src.d1x1.inflow import beam as beam_inflow  # noqa: F401
+from DLR_rt.src.d1x1.inflow import pulse as pulse_inflow  # noqa: F401
+from DLR_rt.src.d1x1.inflow import two_beam as two_beam_inflow  # noqa: F401
 from DLR_rt.src.grid import Grid_1x1d
 from DLR_rt.src.initial_condition import setInitialCondition_1x1d_lr
 from DLR_rt.src.integrators import PSI_lie, PSI_strang
@@ -162,71 +166,6 @@ def setup_domains(Nx: int, Nmu: int, r: int, n_domains: int, seed: int = 0,
     # the order in which the domains are updated (serial vs MPI)
     rngs = [np.random.default_rng([seed, i]) for i in range(n_domains)]
     return grids, lr0s, rngs
-
-
-def beam_inflow(t: float, mu: np.ndarray, mu_min: float = 0.8, ramp: float = 20.0):
-    """ 
-    Sharp one-sided inflow: narrow beam from left to right
-
-    Parameters
-    ----------
-    t: float
-        Current time.
-    mu: np.ndarray
-        Grid in mu
-    mu_min:
-        Beam enters in mu > mu_min, closer to 1 is more narrow.
-    ramp: float
-        Beam is switched on as tanh(ramp * t), larger ramp is sharper.
-
-    Returns
-    -------
-    left, right
-       Inflow values on the physical boundaries, each of shape (Nmu,)
-    """
-    left = np.where(mu > mu_min, np.tanh(ramp * t), 0.0)
-    return left, np.zeros_like(left)
-
-def pulse_inflow(t: float, mu: np.ndarray, mu_min: float = 0.8, ramp: float = 20.0,
-                t_off: float = 0.2):
-    """ 
-    A beam from the left that is switched off after t_off
-
-    Parameters
-    ----------
-    t: float
-        Current time.
-    mu: np.ndarray
-        Grid in mu
-    mu_min:
-        Beam enters in mu > mu_min, closer to 1 is more narrow.
-    ramp: float
-        Beam is switched on as tanh(ramp * t), larger ramp is sharper.
-    t_off: float
-        Time after which the beam is switched off, using tanh(ramp * (t_off - t)).    
-    """
-    envelope= 0.5 * (np.tanh(ramp * t) - np.tanh(ramp * (t - t_off)))
-    left = np.where(mu > mu_min, envelope, 0.0)
-    return left, np.zeros_like(left)
-
-def two_beam_inflow(t: float, mu: np.ndarray, mu_min: float = 0.8, ramp: float = 20.0):
-    """ 
-    Narrow beams from both sides that meet in the middle
-
-    Parameters
-    ----------
-    t: float
-        Current time.
-    mu: np.ndarray
-        Grid in mu
-    mu_min:
-        Beam enters in mu > mu_min, closer to 1 is more narrow.
-    ramp: float
-        Beam is switched on as tanh(ramp * t), larger ramp is sharper.
-    """
-    left = np.where(mu > mu_min, np.tanh(ramp * t), 0.0)
-    right = np.where(mu < -mu_min, np.tanh(ramp * t), 0.0)
-    return left, right
 
 
 
