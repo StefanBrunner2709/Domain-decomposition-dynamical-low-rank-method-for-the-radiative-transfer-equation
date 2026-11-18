@@ -1,0 +1,7 @@
+nohup: ignoring input
+Load average: 0.38 (should be well below 1 for clean timings)
+Old plots    -> plots/archive/2026-11-17_1738
+Old results  -> data/benchmarks/archive/2026-11-17_1738
+Groups: serial correctness scaling balancing presentation
+
+[17:38:09] serial_nx: taskset -c 20 /home/lme/.conda/envs/domain/bin/python -m DLR_rt.benchmarks.d1x1.serial nx
