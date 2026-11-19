@@ -365,6 +365,11 @@ def print_table(records: list[dict]):
 
 def plot_details(res: RunResult, name: str):
     """Solution at t_f, rank history, rank snapshots and timings per process."""
+    print(f"Saved {P.save_fig(details_figure(res, name), name)}")
+
+
+def details_figure(res: RunResult, name: str):
+    """The figure of plot_details, not saved."""
     fig, axes = plt.subplots(2, 2, figsize=(16, 11))
     P.plot_solution(axes[0, 0], res)
     P.plot_rank_history(axes[0, 1], res)
@@ -372,4 +377,4 @@ def plot_details(res: RunResult, name: str):
     P.plot_timings_per_rank(axes[1, 1], res)
     fig.suptitle(f"{name}: {res.n_domains} domains on {len(res.rank_timings)} "
                  f"processes, Nx = {sum(g.Nx for g in res.grids)}")
-    print(f"Saved {P.save_fig(fig, name)}")
+    return fig

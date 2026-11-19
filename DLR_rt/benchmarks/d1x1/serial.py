@@ -255,8 +255,13 @@ def plot(name: str):
 
 def plot_combined():
     """Left: time per step vs N_x. Right: full f vs low-rank storage U, S, V."""
-    rec_nx = C.load_json("serial_nx")["records"]
-    rec_mem = C.load_json("serial_memory")["records"]
+    fig = combined_figure(C.load_json("serial_nx")["records"],
+                          C.load_json("serial_memory")["records"])
+    save(fig, "serial_combined")
+
+
+def combined_figure(rec_nx, rec_mem):
+    """The figure of plot_combined, not saved."""
     with plt.rc_context(STYLE):
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5.5))
 
@@ -285,7 +290,7 @@ def plot_combined():
             ax.legend()
             ax.grid(True, which="both", alpha=0.3)
         fig.tight_layout()
-        save(fig, "serial_combined")
+    return fig
 
 
 STYLE = {"font.size": 13, "axes.titlesize": 13, "legend.fontsize": 11}

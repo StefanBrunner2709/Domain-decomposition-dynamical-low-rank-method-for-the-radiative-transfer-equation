@@ -153,7 +153,12 @@ def plot_summary(experiment: str, records: list[dict], name: str):
     if experiment == "asymmetric":
         plot_asymmetric(records, name)
         return
+    fig = summary_figure(experiment, records)
+    print(f"Saved {P.save_fig(fig, f'bench_{experiment}_{name}')}")
 
+
+def summary_figure(experiment: str, records: list[dict]):
+    """The figure of plot_summary for strong, weak and domains, not saved."""
     p = np.array([rec["p"] for rec in records])
     t = np.array([rec["time_per_step"] for rec in records]) * 1e3
     imbalance = [rec["imbalance"] for rec in records]
@@ -199,7 +204,7 @@ def plot_summary(experiment: str, records: list[dict], name: str):
     for ax in axes:
         if ax.get_legend_handles_labels()[0]:
             ax.legend(fontsize=8)
-    print(f"Saved {P.save_fig(fig, f'bench_{experiment}_{name}')}")
+    return fig
 
 
 def plot_asymmetric(records: list[dict], name: str):

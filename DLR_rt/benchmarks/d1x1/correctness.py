@@ -160,6 +160,16 @@ def print_table(out: dict):
 
 def plot(out: dict, base: dict = BASE):
     """DD error vs. number of subdomains and over time (relative L2 vs. 1 domain)."""
+    fig = correctness_figure(out, base)
+    out_dir = P.PLOTS_DIR / "benchmark_correctness"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_dir / "correctness.png", dpi=200)
+    plt.close(fig)
+    print(f"Saved {out_dir / 'correctness.png'}")
+
+
+def correctness_figure(out: dict, base: dict = BASE):
+    """The figure of plot, not saved."""
     with plt.rc_context({"font.size": 13}):
         fig, ax = plt.subplots(1, 2, figsize=(13, 4.8))
         settings = (f"Nx = {base['Nx']}, N$_\\mu$ = {base['Nmu']}, "
@@ -193,11 +203,7 @@ def plot(out: dict, base: dict = BASE):
             a.grid(True, which="both", alpha=0.3)
         fig.suptitle(settings, fontsize=12)
         fig.tight_layout()
-        out_dir = P.PLOTS_DIR / "benchmark_correctness"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        fig.savefig(out_dir / "correctness.png", dpi=200)
-        plt.close(fig)
-        print(f"Saved {out_dir / 'correctness.png'}")
+    return fig
 
 
 ### compare: one case in detail

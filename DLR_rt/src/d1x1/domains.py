@@ -245,3 +245,18 @@ def integrate_serial(lrs: list[LR], grids: list[Grid_1x1d], rngs: list,
         snap_f=snap_f,
         runtime=perf_counter() - t_start,
     )
+
+if __name__ == "__main__":
+    # Set up one global domain to test the splitting approach
+    Nx, Nmu, r, n_domains = 256, 64, 5, 1
+    lrs, grids, rngs = setup_domains(Nx=Nx, Nmu=Nmu, r=r, n_domains=n_domains)
+    # plot the domain and the initial condition
+    import matplotlib.pyplot as plt
+    plt.figure()
+    for i, g in enumerate(grids):
+        plt.plot(g.X, lrs[i].full()[:, 0], label=f"Domain {i}")
+    plt.title("Initial Condition")
+    plt.xlabel("x")
+    plt.ylabel("f(x, mu=0)")
+    plt.legend()
+    plt.show()
